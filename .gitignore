@@ -1,0 +1,11 @@
+.DS_Store
+/.superpowers/
+/api/node_modules/
+/api/dist/
+/api/coverage/
+/api/.env
+/api/.env.*
+!/api/.env.example
+/yegamo_app/.dart_tool/
+/yegamo_app/build/
+/yegamo_app/coverage/
