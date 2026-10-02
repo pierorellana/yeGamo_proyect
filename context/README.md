@@ -27,6 +27,19 @@ api/                     monolito modular NestJS y worker
 
 `api/contracts/openapi.yaml` es la fuente del contrato HTTP; cualquier cliente o controlador debe alinearse con él. `api/db/migrations/` es la fuente del esquema SQL aplicado a entornos; el SQL de referencia publicado en las specs debe indicar la versión equivalente.
 
+## Baseline aprobada
+
+- [Diseño de fundaciones](../docs/superpowers/specs/2026-10-02-yegamo-platform-foundations-design.md)
+- [Plan de workspace y contrato](../docs/superpowers/plans/2026-10-02-yegamo-workspace-contract-foundations-plan.md)
+- [Contrato OpenAPI canónico](../api/contracts/openapi.yaml)
+- [Matriz de trazabilidad](architecture/traceability.md)
+- [Cierre de fundaciones](plans/FOUNDATIONS-CLOSEOUT.md)
+
+El cierre de fundaciones confirma que la documentación, las decisiones, el
+contrato HTTP y la referencia del prototipo están listos para los planes de
+implementación. No implica que el API NestJS, las migraciones SQL o las
+pantallas Flutter ya estén implementados.
+
 ## Invariantes de producto
 
 - No se inventa una ETA y `LIVE` requiere una fuente autorizada y timestamp reciente.
