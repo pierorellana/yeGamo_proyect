@@ -1,0 +1,960 @@
+openapi: 3.1.0
+info:
+  title: yeGamo API
+  version: 1.1.1
+  description: Contrato REST/JSON v1 con calidad, frescura e identidad normalizadas.
+servers:
+  - url: https://api.yegamo.example/v1
+    description: API versionada
+tags:
+  - name: health
+  - name: places
+  - name: transit
+  - name: journeys
+  - name: active-journeys
+  - name: favorites
+  - name: commutes
+  - name: notifications
+  - name: identity
+  - name: privacy
+  - name: community
+paths:
+  /health:
+    get:
+      tags: [health]
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Servicio disponible
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+  /providers/status:
+    get:
+      tags: [health]
+      operationId: getProviderStatus
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Salud de proveedores
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProviderHealthSnapshot' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /places/search:
+    get:
+      tags: [places]
+      operationId: searchPlaces
+      security: []
+      parameters:
+        - { $ref: '#/components/parameters/Query' }
+        - { $ref: '#/components/parameters/Latitude' }
+        - { $ref: '#/components/parameters/Longitude' }
+      responses:
+        '200':
+          description: Lugares encontrados
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Place' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /places/reverse:
+    get:
+      tags: [places]
+      operationId: reverseGeocode
+      security: []
+      parameters:
+        - { $ref: '#/components/parameters/LatitudeRequired' }
+        - { $ref: '#/components/parameters/LongitudeRequired' }
+      responses:
+        '200':
+          description: Lugar resuelto
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Place' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /transit/stops/nearby:
+    get:
+      tags: [transit]
+      operationId: getNearbyStops
+      security: []
+      parameters:
+        - { $ref: '#/components/parameters/LatitudeRequired' }
+        - { $ref: '#/components/parameters/LongitudeRequired' }
+        - name: radiusM
+          in: query
+          schema: { type: integer, minimum: 50, maximum: 3000, default: 800 }
+      responses:
+        '200':
+          description: Paradas cercanas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TransitStop' }
+  /transit/stops/{stopId}/departures:
+    get:
+      tags: [transit]
+      operationId: getStopDepartures
+      security: []
+      parameters: [{ $ref: '#/components/parameters/StopId' }]
+      responses:
+        '200':
+          description: Salidas estimadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Departure' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /transit/routes/{routeId}:
+    get:
+      tags: [transit]
+      operationId: getTransitRoute
+      security: []
+      parameters: [{ $ref: '#/components/parameters/RouteId' }]
+      responses:
+        '200':
+          description: Ruta canonica
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransitRoute' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /journeys/plan:
+    post:
+      tags: [journeys]
+      operationId: planJourney
+      security: []
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyOptional' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/JourneyPlanRequest' }
+      responses:
+        '200':
+          description: Plan y alternativas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JourneyPlanResponse' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
+  /journeys/{planId}:
+    get:
+      tags: [journeys]
+      operationId: getJourneyPlan
+      security: []
+      parameters: [{ $ref: '#/components/parameters/PlanId' }]
+      responses:
+        '200':
+          description: Plan de viaje
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JourneyPlanResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /journeys/{planId}/options/{optionId}/start:
+    post:
+      tags: [journeys]
+      operationId: startJourney
+      parameters:
+        - { $ref: '#/components/parameters/PlanId' }
+        - { $ref: '#/components/parameters/OptionId' }
+        - { $ref: '#/components/parameters/IdempotencyKeyRequired' }
+      responses:
+        '201':
+          description: Viaje activo creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActiveJourney' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /active-journeys/{id}:
+    get:
+      tags: [active-journeys]
+      operationId: getActiveJourney
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '200':
+          description: Viaje activo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActiveJourney' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /active-journeys/{id}/progress:
+    patch:
+      tags: [active-journeys]
+      operationId: updateActiveJourneyProgress
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ResourceId' }
+        - { $ref: '#/components/parameters/IdempotencyKeyOptional' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/JourneyProgressRequest' }
+      responses:
+        '200':
+          description: Progreso actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActiveJourney' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /active-journeys/{id}/finish:
+    post:
+      tags: [active-journeys]
+      operationId: finishActiveJourney
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ResourceId' }
+        - { $ref: '#/components/parameters/IdempotencyKeyRequired' }
+      responses:
+        '200':
+          description: Viaje finalizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActiveJourney' }
+  /active-journeys/{id}/cancel:
+    post:
+      tags: [active-journeys]
+      operationId: cancelActiveJourney
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ResourceId' }
+        - { $ref: '#/components/parameters/IdempotencyKeyRequired' }
+      responses:
+        '200':
+          description: Viaje cancelado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActiveJourney' }
+  /favorites/places:
+    get:
+      tags: [favorites]
+      operationId: listFavoritePlaces
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lugares guardados
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Place' }
+    post:
+      tags: [favorites]
+      operationId: createFavoritePlace
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaceInput' }
+      responses:
+        '201':
+          description: Lugar guardado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Place' }
+  /favorites/places/{id}:
+    patch:
+      tags: [favorites]
+      operationId: updateFavoritePlace
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlaceInput' }
+      responses:
+        '200':
+          description: Lugar actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Place' }
+    delete:
+      tags: [favorites]
+      operationId: deleteFavoritePlace
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '204': { description: Lugar eliminado }
+  /commute-profiles:
+    get:
+      tags: [commutes]
+      operationId: listCommuteProfiles
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Rutinas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CommuteProfile' }
+    post:
+      tags: [commutes]
+      operationId: createCommuteProfile
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommuteProfileInput' }
+      responses:
+        '201':
+          description: Rutina creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommuteProfile' }
+  /commute-profiles/{id}:
+    patch:
+      tags: [commutes]
+      operationId: updateCommuteProfile
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommuteProfileInput' }
+      responses:
+        '200':
+          description: Rutina actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommuteProfile' }
+    delete:
+      tags: [commutes]
+      operationId: deleteCommuteProfile
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '204': { description: Rutina eliminada }
+  /commute-profiles/{id}/pause:
+    post:
+      tags: [commutes]
+      operationId: pauseCommuteProfile
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '200':
+          description: Rutina pausada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommuteProfile' }
+  /commute-profiles/{id}/resume:
+    post:
+      tags: [commutes]
+      operationId: resumeCommuteProfile
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '200':
+          description: Rutina reanudada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommuteProfile' }
+  /alerts/leave:
+    post:
+      tags: [notifications]
+      operationId: createLeaveAlert
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeaveAlertInput' }
+      responses:
+        '201':
+          description: Aviso creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeaveAlert' }
+  /alerts/{id}:
+    delete:
+      tags: [notifications]
+      operationId: deleteLeaveAlert
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '204': { description: Aviso eliminado }
+  /notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Centro de avisos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notification' }
+  /notifications/{id}/read:
+    patch:
+      tags: [notifications]
+      operationId: markNotificationRead
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '200':
+          description: Aviso actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+  /notifications/read-all:
+    post:
+      tags: [notifications]
+      operationId: markAllNotificationsRead
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Avisos actualizados }
+  /me:
+    get:
+      tags: [identity]
+      operationId: getCurrentUser
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Usuario autenticado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [privacy]
+      operationId: deleteCurrentUser
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
+      responses:
+        '202': { description: Eliminacion de cuenta aceptada }
+  /me/guest-migration:
+    post:
+      tags: [identity]
+      operationId: migrateGuestData
+      description: Operacion explicita, idempotente y auditable.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GuestMigrationRequest' }
+      responses:
+        '200':
+          description: Resultado de migracion
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GuestMigrationResponse' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /me/devices:
+    post:
+      tags: [identity]
+      operationId: registerDevice
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceInstallationInput' }
+      responses:
+        '201':
+          description: Instalacion registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceInstallation' }
+  /me/devices/{id}:
+    delete:
+      tags: [identity]
+      operationId: revokeDevice
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '204': { description: Instalacion revocada }
+  /me/preferences:
+    get:
+      tags: [identity]
+      operationId: getPreferences
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Preferencias
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPreference' }
+    patch:
+      tags: [identity]
+      operationId: updatePreferences
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserPreference' }
+      responses:
+        '200':
+          description: Preferencias actualizadas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPreference' }
+  /me/data-export:
+    post:
+      tags: [privacy]
+      operationId: requestDataExport
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
+      responses:
+        '202':
+          description: Exportacion encolada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DataExportRequest' }
+  /reports:
+    post:
+      tags: [community]
+      operationId: createCommunityReport
+      description: Capacidad post-MVP mantenida para compatibilidad contractual.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommunityReportInput' }
+      responses:
+        '201':
+          description: Reporte creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommunityReport' }
+  /reports/nearby:
+    get:
+      tags: [community]
+      operationId: getNearbyReports
+      security: []
+      parameters:
+        - { $ref: '#/components/parameters/LatitudeRequired' }
+        - { $ref: '#/components/parameters/LongitudeRequired' }
+      responses:
+        '200':
+          description: Reportes cercanos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CommunityReport' }
+  /reports/{id}/confirm:
+    post:
+      tags: [community]
+      operationId: confirmCommunityReport
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '204': { description: Confirmacion registrada }
+  /reports/{id}/resolve:
+    post:
+      tags: [community]
+      operationId: resolveCommunityReport
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses:
+        '204': { description: Reporte resuelto }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Query:
+      name: q
+      in: query
+      required: true
+      schema: { type: string, minLength: 2 }
+    Latitude:
+      name: lat
+      in: query
+      schema: { type: number, minimum: -90, maximum: 90 }
+    Longitude:
+      name: lon
+      in: query
+      schema: { type: number, minimum: -180, maximum: 180 }
+    LatitudeRequired:
+      name: lat
+      in: query
+      required: true
+      schema: { type: number, minimum: -90, maximum: 90 }
+    LongitudeRequired:
+      name: lon
+      in: query
+      required: true
+      schema: { type: number, minimum: -180, maximum: 180 }
+    StopId:
+      name: stopId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RouteId:
+      name: routeId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PlanId:
+      name: planId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OptionId:
+      name: optionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    IdempotencyKeyOptional:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  responses:
+    Unauthorized:
+      description: Falta autenticacion valida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflicto de estado o idempotencia
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Solicitud invalida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ProviderUnavailable:
+      description: Proveedor no disponible o sin datos autorizados
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    GeoPoint:
+      type: object
+      required: [lat, lon]
+      properties:
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lon: { type: number, minimum: -180, maximum: 180 }
+    DataState:
+      type: string
+      enum: [CURRENT, STALE, DEGRADED, OFFLINE_CACHE, UNAVAILABLE]
+    HealthResponse:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
+        traceId: { type: string }
+    JourneyPlanRequest:
+      type: object
+      required: [origin, destination, timeMode]
+      properties:
+        origin: { $ref: '#/components/schemas/GeoPoint' }
+        destination: { $ref: '#/components/schemas/GeoPoint' }
+        timeMode: { type: string, enum: [LEAVE_NOW, DEPART_AT, ARRIVE_BY] }
+        time: { type: string, format: date-time }
+        preference:
+          type: string
+          enum: [BALANCED, FASTEST, LESS_WALKING, FEWER_TRANSFERS, MOST_RELIABLE]
+          default: BALANCED
+        maxWalkMin: { type: integer, minimum: 1, maximum: 60, default: 12 }
+        extraSafetyMarginMin: { type: integer, minimum: 0, maximum: 60, default: 0 }
+    JourneyPlanResponse:
+      type: object
+      required: [planId, dataState, options]
+      properties:
+        planId: { type: string, format: uuid }
+        recommendedLeaveAt: { type: string, format: date-time }
+        arrivalWindow: { $ref: '#/components/schemas/TimeWindow' }
+        dataState: { $ref: '#/components/schemas/DataState' }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/JourneyOption' }
+    TimeWindow:
+      type: object
+      required: [from, to]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+    JourneyOption:
+      type: object
+      required: [id, durationMin, transfers, legs, dataQuality]
+      properties:
+        id: { type: string, format: uuid }
+        durationMin: { type: integer, minimum: 0 }
+        walkMin: { type: integer, minimum: 0 }
+        transfers: { type: integer, minimum: 0 }
+        reliability: { $ref: '#/components/schemas/Reliability' }
+        dataQuality: { $ref: '#/components/schemas/DataQuality' }
+        legs:
+          type: array
+          items: { $ref: '#/components/schemas/JourneyLeg' }
+    JourneyLeg:
+      type: object
+      required: [mode, from, to]
+      properties:
+        mode: { type: string, enum: [WALK, TRANSIT] }
+        from: { $ref: '#/components/schemas/GeoPoint' }
+        to: { $ref: '#/components/schemas/GeoPoint' }
+        departureAt: { type: string, format: date-time }
+        arrivalAt: { type: string, format: date-time }
+        routeId: { type: string, format: uuid }
+        fromStopId: { type: string, format: uuid }
+        toStopId: { type: string, format: uuid }
+        instructions:
+          type: array
+          items: { type: string }
+    Reliability:
+      type: object
+      properties:
+        score: { type: integer, minimum: 0, maximum: 100 }
+        level: { type: string, enum: [HIGH, MEDIUM, LOW, UNKNOWN] }
+        sampleSize: { type: integer, minimum: 0 }
+    DataQuality:
+      type: object
+      required: [dataState, liveVehicle]
+      properties:
+        dataState: { $ref: '#/components/schemas/DataState' }
+        freshness: { type: string, format: date-time }
+        liveVehicle: { type: boolean }
+        providerDisplayName: { type: [string, 'null'] }
+        sourceAuthorized: { type: boolean }
+    Place:
+      type: object
+      required: [id, label, location]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        location: { $ref: '#/components/schemas/GeoPoint' }
+        source: { type: string }
+    PlaceInput:
+      type: object
+      required: [label, location]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 120 }
+        location: { $ref: '#/components/schemas/GeoPoint' }
+    TransitStop:
+      type: object
+      required: [id, name, location]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        location: { $ref: '#/components/schemas/GeoPoint' }
+        distanceM: { type: number, minimum: 0 }
+        dataState: { $ref: '#/components/schemas/DataState' }
+    Departure:
+      type: object
+      required: [routeId, expectedAt, dataState]
+      properties:
+        routeId: { type: string, format: uuid }
+        expectedAt: { type: string, format: date-time }
+        estimate: { $ref: '#/components/schemas/TimeWindow' }
+        dataState: { $ref: '#/components/schemas/DataState' }
+        liveVehicle: { type: boolean }
+    TransitRoute:
+      type: object
+      required: [id, shortName, agencyName]
+      properties:
+        id: { type: string, format: uuid }
+        shortName: { type: string }
+        longName: { type: string }
+        agencyName: { type: string }
+        color: { type: string }
+    ActiveJourney:
+      type: object
+      required: [id, optionId, status, dataState]
+      properties:
+        id: { type: string, format: uuid }
+        optionId: { type: string, format: uuid }
+        status: { type: string, enum: [PLANNED, ACTIVE, COMPLETED, CANCELLED, ABANDONED] }
+        currentLegIndex: { type: integer, minimum: 0 }
+        eta: { type: string, format: date-time }
+        dataState: { $ref: '#/components/schemas/DataState' }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/JourneyEvent' }
+    JourneyEvent:
+      type: object
+      required: [id, type, occurredAt]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        occurredAt: { type: string, format: date-time }
+        details: { type: object, additionalProperties: true }
+    JourneyProgressRequest:
+      type: object
+      properties:
+        currentLegIndex: { type: integer, minimum: 0 }
+        location: { $ref: '#/components/schemas/GeoPoint' }
+        occurredAt: { type: string, format: date-time }
+    CommuteProfile:
+      type: object
+      required: [id, name, weekdays, targetArrival, enabled]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        origin: { $ref: '#/components/schemas/GeoPoint' }
+        destination: { $ref: '#/components/schemas/GeoPoint' }
+        weekdays:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 7 }
+        targetArrival: { type: string, format: time }
+        enabled: { type: boolean }
+    CommuteProfileInput:
+      type: object
+      required: [name, origin, destination, weekdays, targetArrival]
+      properties:
+        name: { type: string }
+        origin: { $ref: '#/components/schemas/GeoPoint' }
+        destination: { $ref: '#/components/schemas/GeoPoint' }
+        weekdays:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 7 }
+        targetArrival: { type: string, format: time }
+    LeaveAlert:
+      type: object
+      required: [id, scheduledFor, status]
+      properties:
+        id: { type: string, format: uuid }
+        scheduledFor: { type: string, format: date-time }
+        status: { type: string, enum: [SCHEDULED, SENT, CANCELLED, FAILED] }
+    LeaveAlertInput:
+      type: object
+      required: [scheduledFor]
+      properties:
+        commuteProfileId: { type: string, format: uuid }
+        journeyPlanId: { type: string, format: uuid }
+        scheduledFor: { type: string, format: date-time }
+    Notification:
+      type: object
+      required: [id, type, title, body, isRead]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        title: { type: string }
+        body: { type: string }
+        isRead: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    User:
+      type: object
+      required: [id, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: [string, 'null'] }
+        email: { type: [string, 'null'], format: email }
+        createdAt: { type: string, format: date-time }
+    UserPreference:
+      type: object
+      properties:
+        language: { type: string }
+        defaultPreference: { type: string }
+        maxWalkMin: { type: integer, minimum: 1, maximum: 60 }
+        extraSafetyMarginMin: { type: integer, minimum: 0, maximum: 60 }
+        locationConsent: { type: boolean }
+    DeviceInstallation:
+      type: object
+      required: [id, platform, active]
+      properties:
+        id: { type: string, format: uuid }
+        platform: { type: string, enum: [IOS, ANDROID] }
+        appVersion: { type: string }
+        active: { type: boolean }
+        lastSeenAt: { type: string, format: date-time }
+    DeviceInstallationInput:
+      type: object
+      required: [installationId, platform, pushToken]
+      properties:
+        installationId: { type: string, maxLength: 160 }
+        platform: { type: string, enum: [IOS, ANDROID] }
+        pushToken: { type: string, writeOnly: true }
+        appVersion: { type: string }
+    GuestMigrationRequest:
+      type: object
+      required: [clientDataVersion, items]
+      properties:
+        clientDataVersion: { type: string }
+        items:
+          type: array
+          items: { type: object, additionalProperties: true }
+    GuestMigrationResponse:
+      type: object
+      required: [migrationId, importedCount, skippedCount]
+      properties:
+        migrationId: { type: string, format: uuid }
+        importedCount: { type: integer, minimum: 0 }
+        skippedCount: { type: integer, minimum: 0 }
+        idempotentReplay: { type: boolean }
+    DataExportRequest:
+      type: object
+      required: [id, status, requestedAt]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [QUEUED, PROCESSING, READY, EXPIRED, FAILED] }
+        requestedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+    ProviderHealthSnapshot:
+      type: object
+      required: [provider, status, checkedAt]
+      properties:
+        provider: { type: string }
+        capability: { type: string }
+        status: { type: string, enum: [HEALTHY, DEGRADED, UNAVAILABLE] }
+        latencyMs: { type: integer, minimum: 0 }
+        checkedAt: { type: string, format: date-time }
+    CommunityReport:
+      type: object
+      required: [id, type, status, location]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        status: { type: string, enum: [ACTIVE, CONFIRMED, RESOLVED, EXPIRED, REJECTED] }
+        location: { $ref: '#/components/schemas/GeoPoint' }
+    CommunityReportInput:
+      type: object
+      required: [type, location]
+      properties:
+        type: { type: string }
+        location: { $ref: '#/components/schemas/GeoPoint' }
+        details: { type: object, additionalProperties: true }
+    Error:
+      type: object
+      required: [code, message, traceId]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+        traceId: { type: string }
