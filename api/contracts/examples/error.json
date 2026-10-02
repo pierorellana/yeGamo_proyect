@@ -1,0 +1,9 @@
+{
+  "code": "PROVIDER_TIMEOUT",
+  "message": "No fue posible obtener una planificación actualizada.",
+  "details": {
+    "dataState": "DEGRADED",
+    "retryable": true
+  },
+  "traceId": "6f36f44f-5d68-4e37-9074-2a5f9a1e6cf4"
+}

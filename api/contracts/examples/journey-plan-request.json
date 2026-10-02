@@ -1,0 +1,15 @@
+{
+  "origin": {
+    "lat": -2.170997,
+    "lon": -79.922359
+  },
+  "destination": {
+    "lat": -2.145404,
+    "lon": -79.893123
+  },
+  "timeMode": "ARRIVE_BY",
+  "time": "2026-10-02T08:00:00-05:00",
+  "preference": "RELIABLE",
+  "maxWalkMin": 12,
+  "extraSafetyMarginMin": 5
+}

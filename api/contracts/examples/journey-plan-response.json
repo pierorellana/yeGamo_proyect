@@ -1,0 +1,67 @@
+{
+  "planId": "2b7f5e4e-8e4a-4db7-8f9c-0f6e1d0b6c11",
+  "recommendedLeaveAt": "2026-10-02T07:06:00-05:00",
+  "arrivalWindow": {
+    "from": "2026-10-02T07:48:00-05:00",
+    "to": "2026-10-02T07:57:00-05:00"
+  },
+  "dataState": "CURRENT",
+  "options": [
+    {
+      "id": "cf7d4a5b-0ee9-4629-a640-5dbd4a0b2d2c",
+      "durationMin": 52,
+      "walkMin": 10,
+      "transfers": 1,
+      "reliability": {
+        "score": 84,
+        "level": "HIGH",
+        "sampleSize": 132
+      },
+      "dataQuality": {
+        "freshness": "CURRENT",
+        "dataState": "CURRENT",
+        "liveVehicle": false,
+        "observedAt": null,
+        "providerDisplayName": null
+      },
+      "legs": [
+        {
+          "mode": "WALK",
+          "from": {
+            "lat": -2.170997,
+            "lon": -79.922359
+          },
+          "to": {
+            "lat": -2.169511,
+            "lon": -79.916204
+          },
+          "durationMin": 7,
+          "departureAt": "2026-10-02T07:06:00-05:00",
+          "arrivalAt": "2026-10-02T07:13:00-05:00",
+          "instructions": ["Camina hacia la parada de conexión."],
+          "routeId": null,
+          "fromStopId": null,
+          "toStopId": "97c0ec85-5f22-42c2-855d-04aef530af07"
+        },
+        {
+          "mode": "TRANSIT",
+          "from": {
+            "lat": -2.169511,
+            "lon": -79.916204
+          },
+          "to": {
+            "lat": -2.145404,
+            "lon": -79.893123
+          },
+          "durationMin": 38,
+          "departureAt": "2026-10-02T07:16:00-05:00",
+          "arrivalAt": "2026-10-02T07:54:00-05:00",
+          "instructions": ["Aborda el servicio autorizado disponible."],
+          "routeId": "7b2b3a6d-5a20-4f47-9ed7-6c2ea548b1ac",
+          "fromStopId": "97c0ec85-5f22-42c2-855d-04aef530af07",
+          "toStopId": "9c725e95-7b45-4b75-9b6d-4a06ad12d41f"
+        }
+      ]
+    }
+  ]
+}

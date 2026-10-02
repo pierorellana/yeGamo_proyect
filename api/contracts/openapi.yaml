@@ -2,10 +2,12 @@ openapi: 3.1.0
 info:
   title: yeGamo API
   version: 1.1.1
-  description: Contrato REST/JSON v1 con calidad, frescura e identidad normalizadas.
+  description: >-
+    Contrato REST/JSON versionado para planificación multimodal, movilidad
+    cercana, viajes activos, rutinas, avisos y privacidad.
 servers:
   - url: /v1
-    description: API versionada
+    description: API versionada; el host se configura por ambiente.
 tags:
   - name: health
   - name: places
@@ -18,6 +20,7 @@ tags:
   - name: identity
   - name: privacy
   - name: community
+    description: Capacidades post-MVP, publicadas para compatibilidad contractual.
 paths:
   /health:
     get:
@@ -26,10 +29,11 @@ paths:
       security: []
       responses:
         '200':
-          description: Servicio disponible
+          description: Servicio disponible.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/HealthResponse' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
   /providers/status:
     get:
       tags: [health]
@@ -37,13 +41,14 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: Salud de proveedores
+          description: Salud de proveedores autorizados.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/ProviderHealthSnapshot' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /places/search:
     get:
       tags: [places]
@@ -51,51 +56,53 @@ paths:
       security: []
       parameters:
         - { $ref: '#/components/parameters/Query' }
-        - { $ref: '#/components/parameters/Latitude' }
-        - { $ref: '#/components/parameters/Longitude' }
+        - { $ref: '#/components/parameters/LatitudeOptional' }
+        - { $ref: '#/components/parameters/LongitudeOptional' }
       responses:
         '200':
-          description: Lugares encontrados
+          description: Lugares encontrados.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Place' }
         '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
   /places/reverse:
     get:
       tags: [places]
       operationId: reverseGeocode
       security: []
       parameters:
-        - { $ref: '#/components/parameters/LatitudeRequired' }
-        - { $ref: '#/components/parameters/LongitudeRequired' }
+        - { $ref: '#/components/parameters/Latitude' }
+        - { $ref: '#/components/parameters/Longitude' }
       responses:
         '200':
-          description: Lugar resuelto
+          description: Lugar resuelto.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Place' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /transit/stops/nearby:
     get:
       tags: [transit]
       operationId: getNearbyStops
       security: []
       parameters:
-        - { $ref: '#/components/parameters/LatitudeRequired' }
-        - { $ref: '#/components/parameters/LongitudeRequired' }
-        - name: radiusM
-          in: query
-          schema: { type: integer, minimum: 50, maximum: 3000, default: 800 }
+        - { $ref: '#/components/parameters/Latitude' }
+        - { $ref: '#/components/parameters/Longitude' }
+        - { $ref: '#/components/parameters/RadiusM' }
       responses:
         '200':
-          description: Paradas cercanas
+          description: Paradas cercanas con estado de datos.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/TransitStop' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
   /transit/stops/{stopId}/departures:
     get:
       tags: [transit]
@@ -104,13 +111,14 @@ paths:
       parameters: [{ $ref: '#/components/parameters/StopId' }]
       responses:
         '200':
-          description: Salidas estimadas
+          description: Salidas estimadas.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Departure' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
   /transit/routes/{routeId}:
     get:
       tags: [transit]
@@ -119,7 +127,7 @@ paths:
       parameters: [{ $ref: '#/components/parameters/RouteId' }]
       responses:
         '200':
-          description: Ruta canonica
+          description: Ruta canónica.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TransitRoute' }
@@ -135,12 +143,19 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/JourneyPlanRequest' }
+            examples:
+              guayaquil:
+                externalValue: ./examples/journey-plan-request.json
       responses:
         '200':
-          description: Plan y alternativas
+          description: Plan y alternativas ordenadas.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/JourneyPlanResponse' }
+              examples:
+                guayaquil:
+                  externalValue: ./examples/journey-plan-response.json
+        '400': { $ref: '#/components/responses/BadRequest' }
         '422': { $ref: '#/components/responses/ValidationError' }
         '503': { $ref: '#/components/responses/ProviderUnavailable' }
   /journeys/{planId}:
@@ -151,7 +166,7 @@ paths:
       parameters: [{ $ref: '#/components/parameters/PlanId' }]
       responses:
         '200':
-          description: Plan de viaje
+          description: Plan de viaje.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/JourneyPlanResponse' }
@@ -167,11 +182,14 @@ paths:
         - { $ref: '#/components/parameters/IdempotencyKeyRequired' }
       responses:
         '201':
-          description: Viaje activo creado
+          description: Viaje activo creado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ActiveJourney' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /active-journeys/{id}:
     get:
       tags: [active-journeys]
@@ -180,7 +198,7 @@ paths:
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
         '200':
-          description: Viaje activo
+          description: Viaje activo.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ActiveJourney' }
@@ -193,7 +211,7 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { $ref: '#/components/parameters/ResourceId' }
-        - { $ref: '#/components/parameters/IdempotencyKeyOptional' }
+        - { $ref: '#/components/parameters/IdempotencyKeyRequired' }
       requestBody:
         required: true
         content:
@@ -201,11 +219,13 @@ paths:
             schema: { $ref: '#/components/schemas/JourneyProgressRequest' }
       responses:
         '200':
-          description: Progreso actualizado
+          description: Progreso actualizado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ActiveJourney' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /active-journeys/{id}/finish:
     post:
       tags: [active-journeys]
@@ -216,10 +236,13 @@ paths:
         - { $ref: '#/components/parameters/IdempotencyKeyRequired' }
       responses:
         '200':
-          description: Viaje finalizado
+          description: Viaje finalizado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ActiveJourney' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /active-journeys/{id}/cancel:
     post:
       tags: [active-journeys]
@@ -230,10 +253,13 @@ paths:
         - { $ref: '#/components/parameters/IdempotencyKeyRequired' }
       responses:
         '200':
-          description: Viaje cancelado
+          description: Viaje cancelado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ActiveJourney' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /favorites/places:
     get:
       tags: [favorites]
@@ -241,12 +267,13 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: Lugares guardados
+          description: Lugares guardados.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Place' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [favorites]
       operationId: createFavoritePlace
@@ -259,10 +286,13 @@ paths:
             schema: { $ref: '#/components/schemas/PlaceInput' }
       responses:
         '201':
-          description: Lugar guardado
+          description: Lugar guardado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Place' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /favorites/places/{id}:
     patch:
       tags: [favorites]
@@ -276,17 +306,22 @@ paths:
             schema: { $ref: '#/components/schemas/PlaceInput' }
       responses:
         '200':
-          description: Lugar actualizado
+          description: Lugar actualizado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Place' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
     delete:
       tags: [favorites]
       operationId: deleteFavoritePlace
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
-        '204': { description: Lugar eliminado }
+        '204': { description: Lugar eliminado. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /commute-profiles:
     get:
       tags: [commutes]
@@ -294,12 +329,13 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: Rutinas
+          description: Rutinas.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/CommuteProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [commutes]
       operationId: createCommuteProfile
@@ -312,10 +348,12 @@ paths:
             schema: { $ref: '#/components/schemas/CommuteProfileInput' }
       responses:
         '201':
-          description: Rutina creada
+          description: Rutina creada.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CommuteProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /commute-profiles/{id}:
     patch:
       tags: [commutes]
@@ -329,41 +367,54 @@ paths:
             schema: { $ref: '#/components/schemas/CommuteProfileInput' }
       responses:
         '200':
-          description: Rutina actualizada
+          description: Rutina actualizada.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CommuteProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
     delete:
       tags: [commutes]
       operationId: deleteCommuteProfile
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
-        '204': { description: Rutina eliminada }
+        '204': { description: Rutina eliminada. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /commute-profiles/{id}/pause:
     post:
       tags: [commutes]
       operationId: pauseCommuteProfile
       security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      parameters:
+        - { $ref: '#/components/parameters/ResourceId' }
+        - { $ref: '#/components/parameters/IdempotencyKeyRequired' }
       responses:
         '200':
-          description: Rutina pausada
+          description: Rutina pausada.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CommuteProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /commute-profiles/{id}/resume:
     post:
       tags: [commutes]
       operationId: resumeCommuteProfile
       security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      parameters:
+        - { $ref: '#/components/parameters/ResourceId' }
+        - { $ref: '#/components/parameters/IdempotencyKeyRequired' }
       responses:
         '200':
-          description: Rutina reanudada
+          description: Rutina reanudada.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CommuteProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /alerts/leave:
     post:
       tags: [notifications]
@@ -377,10 +428,12 @@ paths:
             schema: { $ref: '#/components/schemas/LeaveAlertInput' }
       responses:
         '201':
-          description: Aviso creado
+          description: Aviso creado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/LeaveAlert' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /alerts/{id}:
     delete:
       tags: [notifications]
@@ -388,7 +441,9 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
-        '204': { description: Aviso eliminado }
+        '204': { description: Aviso eliminado. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /notifications:
     get:
       tags: [notifications]
@@ -399,10 +454,11 @@ paths:
         - { $ref: '#/components/parameters/PageSize' }
       responses:
         '200':
-          description: Centro de avisos
+          description: Centro de avisos paginado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PaginatedNotifications' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /notifications/{id}/read:
     patch:
       tags: [notifications]
@@ -411,17 +467,20 @@ paths:
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
         '200':
-          description: Aviso actualizado
+          description: Aviso actualizado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /notifications/read-all:
     post:
       tags: [notifications]
       operationId: markAllNotificationsRead
       security: [{ bearerAuth: [] }]
       responses:
-        '204': { description: Avisos actualizados }
+        '204': { description: Avisos actualizados. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /me:
     get:
       tags: [identity]
@@ -429,7 +488,7 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: Usuario autenticado
+          description: Usuario autenticado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/User' }
@@ -440,12 +499,14 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
       responses:
-        '202': { description: Eliminacion de cuenta aceptada }
+        '202': { description: Eliminación de cuenta aceptada. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /me/guest-migration:
     post:
       tags: [identity]
       operationId: migrateGuestData
-      description: Operacion explicita, idempotente y auditable.
+      description: Operación explícita, idempotente, transaccional y auditable.
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
       requestBody:
@@ -455,11 +516,13 @@ paths:
             schema: { $ref: '#/components/schemas/GuestMigrationRequest' }
       responses:
         '200':
-          description: Resultado de migracion
+          description: Resultado de migración.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/GuestMigrationResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /me/devices:
     post:
       tags: [identity]
@@ -473,10 +536,13 @@ paths:
             schema: { $ref: '#/components/schemas/DeviceInstallationInput' }
       responses:
         '201':
-          description: Instalacion registrada
+          description: Instalación registrada.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DeviceInstallation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /me/devices/{id}:
     delete:
       tags: [identity]
@@ -484,7 +550,9 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
-        '204': { description: Instalacion revocada }
+        '204': { description: Instalación revocada. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /me/preferences:
     get:
       tags: [identity]
@@ -492,10 +560,11 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: Preferencias
+          description: Preferencias.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/UserPreferences' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     patch:
       tags: [identity]
       operationId: updatePreferences
@@ -507,10 +576,12 @@ paths:
             schema: { $ref: '#/components/schemas/UserPreferences' }
       responses:
         '200':
-          description: Preferencias actualizadas
+          description: Preferencias actualizadas.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/UserPreferences' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /me/data-export:
     post:
       tags: [privacy]
@@ -519,10 +590,12 @@ paths:
       parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
       responses:
         '202':
-          description: Exportacion encolada
+          description: Exportación encolada.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DataExportRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /reports:
     post:
       tags: [community]
@@ -537,26 +610,29 @@ paths:
             schema: { $ref: '#/components/schemas/CommunityReportInput' }
       responses:
         '201':
-          description: Reporte creado
+          description: Reporte creado.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CommunityReport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /reports/nearby:
     get:
       tags: [community]
       operationId: getNearbyReports
       security: []
       parameters:
-        - { $ref: '#/components/parameters/LatitudeRequired' }
-        - { $ref: '#/components/parameters/LongitudeRequired' }
+        - { $ref: '#/components/parameters/Latitude' }
+        - { $ref: '#/components/parameters/Longitude' }
       responses:
         '200':
-          description: Reportes cercanos
+          description: Reportes cercanos.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/CommunityReport' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /reports/{id}/confirm:
     post:
       tags: [community]
@@ -564,7 +640,9 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
-        '204': { description: Confirmacion registrada }
+        '204': { description: Confirmación registrada. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /reports/{id}/resolve:
     post:
       tags: [community]
@@ -572,37 +650,47 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
-        '204': { description: Reporte resuelto }
+        '204': { description: Reporte resuelto. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: JWT validado contra el proveedor OIDC configurado por ambiente.
   parameters:
     Query:
       name: q
       in: query
       required: true
-      schema: { type: string, minLength: 2 }
+      schema: { type: string, minLength: 2, maxLength: 160 }
     Latitude:
       name: lat
       in: query
+      required: true
       schema: { type: number, minimum: -90, maximum: 90 }
     Longitude:
       name: lon
       in: query
+      required: true
       schema: { type: number, minimum: -180, maximum: 180 }
-    LatitudeRequired:
+    LatitudeOptional:
       name: lat
       in: query
-      required: true
+      required: false
       schema: { type: number, minimum: -90, maximum: 90 }
-    LongitudeRequired:
+    LongitudeOptional:
       name: lon
       in: query
-      required: true
+      required: false
       schema: { type: number, minimum: -180, maximum: 180 }
+    RadiusM:
+      name: radiusM
+      in: query
+      required: false
+      schema: { type: integer, minimum: 50, maximum: 3000, default: 800 }
     Page:
       name: page
       in: query
@@ -642,6 +730,7 @@ components:
       name: Idempotency-Key
       in: header
       required: true
+      description: Clave estable por operación para hacer seguros los reintentos.
       schema: { type: string, minLength: 8, maxLength: 128 }
     IdempotencyKeyOptional:
       name: Idempotency-Key
@@ -649,38 +738,84 @@ components:
       required: false
       schema: { type: string, minLength: 8, maxLength: 128 }
   responses:
+    BadRequest:
+      description: Solicitud malformada.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     Unauthorized:
-      description: Falta autenticacion valida
+      description: Falta autenticación válida.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: El principal no tiene permiso para la operación.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     NotFound:
-      description: Recurso no encontrado
+      description: Recurso no encontrado.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Conflict:
-      description: Conflicto de estado o idempotencia
+      description: Conflicto de estado o de idempotencia.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     ValidationError:
-      description: Solicitud invalida
+      description: Solicitud que no cumple el contrato o una regla de dominio.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Demasiadas solicitudes.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     ProviderUnavailable:
-      description: Proveedor no disponible o sin datos autorizados
+      description: Proveedor no disponible o sin datos autorizados.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+  headers:
+    TraceId:
+      description: Identificador de correlación de la solicitud.
+      schema: { type: string, minLength: 1, maxLength: 128 }
   schemas:
     GeoPoint:
       type: object
+      additionalProperties: false
       required: [lat, lon]
       properties:
-        lat: { type: number, minimum: -90, maximum: 90 }
-        lon: { type: number, minimum: -180, maximum: 180 }
+        lat: { type: number, minimum: -90, maximum: 90, example: -2.170997 }
+        lon: { type: number, minimum: -180, maximum: 180, example: -79.922359 }
     DataState:
       type: string
       enum: [CURRENT, STALE, DEGRADED, OFFLINE_CACHE, UNAVAILABLE]
@@ -689,13 +824,72 @@ components:
       enum: [CURRENT, STALE, UNKNOWN]
     HealthResponse:
       type: object
-      required: [status, version]
+      required: [status, version, traceId]
       properties:
         status: { type: string, enum: [ok, degraded] }
-        version: { type: string }
-        traceId: { type: string }
+        version: { type: string, example: 1.1.1 }
+        traceId: { type: string, example: health-7c7c8d }
+    Place:
+      type: object
+      required: [id, label, location]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string, example: Centro de Guayaquil }
+        location: { $ref: '#/components/schemas/GeoPoint' }
+        source: { type: string, nullable: true, example: null }
+    PlaceInput:
+      type: object
+      additionalProperties: false
+      required: [label, location]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 120 }
+        location: { $ref: '#/components/schemas/GeoPoint' }
+    TransitAgency:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, example: Operador autorizado de Guayaquil }
+        url: { type: string, format: uri, nullable: true }
+        timezone: { type: string, example: America/Guayaquil }
+    TransitRoute:
+      type: object
+      required: [id, shortName, agency]
+      properties:
+        id: { type: string, format: uuid }
+        shortName: { type: string, example: R-12 }
+        longName: { type: string, nullable: true }
+        agency: { $ref: '#/components/schemas/TransitAgency' }
+        color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$', nullable: true }
+        dataState: { $ref: '#/components/schemas/DataState' }
+    TransitStop:
+      type: object
+      required: [id, name, location, dataState]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, example: Parada Centro }
+        location: { $ref: '#/components/schemas/GeoPoint' }
+        distanceM: { type: number, minimum: 0, example: 420 }
+        dataState: { $ref: '#/components/schemas/DataState' }
+    ETAEstimate:
+      type: object
+      required: [window, dataState, liveVehicle]
+      properties:
+        window: { $ref: '#/components/schemas/TimeWindow' }
+        dataState: { $ref: '#/components/schemas/DataState' }
+        liveVehicle: { type: boolean }
+        observedAt: { type: string, format: date-time, nullable: true }
+    Departure:
+      type: object
+      required: [routeId, estimate, dataState]
+      properties:
+        routeId: { type: string, format: uuid }
+        estimate: { $ref: '#/components/schemas/ETAEstimate' }
+        dataState: { $ref: '#/components/schemas/DataState' }
+        stopId: { type: string, format: uuid }
     JourneyPlanRequest:
       type: object
+      additionalProperties: false
       required: [origin, destination, timeMode]
       properties:
         origin: { $ref: '#/components/schemas/GeoPoint' }
@@ -720,7 +914,7 @@ components:
       required: [planId, dataState, options]
       properties:
         planId: { type: string, format: uuid }
-        recommendedLeaveAt: { type: string, format: date-time }
+        recommendedLeaveAt: { type: string, format: date-time, nullable: true }
         arrivalWindow: { $ref: '#/components/schemas/TimeWindow' }
         dataState: { $ref: '#/components/schemas/DataState' }
         options:
@@ -753,16 +947,17 @@ components:
         from: { $ref: '#/components/schemas/GeoPoint' }
         to: { $ref: '#/components/schemas/GeoPoint' }
         durationMin: { type: integer, minimum: 0 }
-        departureAt: { type: string, format: date-time }
-        arrivalAt: { type: string, format: date-time }
-        routeId: { type: string, format: uuid }
-        fromStopId: { type: string, format: uuid }
-        toStopId: { type: string, format: uuid }
+        departureAt: { type: string, format: date-time, nullable: true }
+        arrivalAt: { type: string, format: date-time, nullable: true }
+        routeId: { type: string, format: uuid, nullable: true }
+        fromStopId: { type: string, format: uuid, nullable: true }
+        toStopId: { type: string, format: uuid, nullable: true }
         instructions:
           type: array
           items: { type: string }
     Reliability:
       type: object
+      required: [score, level, sampleSize]
       properties:
         score: { type: integer, minimum: 0, maximum: 100 }
         level: { type: string, enum: [HIGH, MEDIUM, LOW, UNKNOWN] }
@@ -775,68 +970,11 @@ components:
         dataState: { $ref: '#/components/schemas/DataState' }
         liveVehicle: { type: boolean }
         observedAt: { type: string, format: date-time, nullable: true }
-        providerDisplayName: { type: string, nullable: true }
-        sourceAuthorized: { type: boolean }
-    Place:
-      type: object
-      required: [id, label, location]
-      properties:
-        id: { type: string, format: uuid }
-        label: { type: string }
-        location: { $ref: '#/components/schemas/GeoPoint' }
-        source: { type: string }
-    PlaceInput:
-      type: object
-      required: [label, location]
-      properties:
-        label: { type: string, minLength: 1, maxLength: 120 }
-        location: { $ref: '#/components/schemas/GeoPoint' }
-    TransitStop:
-      type: object
-      required: [id, name, location]
-      properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        location: { $ref: '#/components/schemas/GeoPoint' }
-        distanceM: { type: number, minimum: 0 }
-        dataState: { $ref: '#/components/schemas/DataState' }
-    TransitAgency:
-      type: object
-      required: [id, name]
-      properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        url: { type: string, format: uri, nullable: true }
-        timezone: { type: string }
-    ETAEstimate:
-      type: object
-      required: [window, dataState, liveVehicle]
-      properties:
-        window: { $ref: '#/components/schemas/TimeWindow' }
-        dataState: { $ref: '#/components/schemas/DataState' }
-        liveVehicle: { type: boolean }
-        observedAt: { type: string, format: date-time, nullable: true }
-    Departure:
-      type: object
-      required: [routeId, estimate, dataState]
-      properties:
-        routeId: { type: string, format: uuid }
-        estimate: { $ref: '#/components/schemas/ETAEstimate' }
-        dataState: { $ref: '#/components/schemas/DataState' }
-        stopId: { type: string, format: uuid }
-    TransitRoute:
-      type: object
-      required: [id, shortName, agency]
-      properties:
-        id: { type: string, format: uuid }
-        shortName: { type: string }
-        longName: { type: string }
-        agency: { $ref: '#/components/schemas/TransitAgency' }
-        color: { type: string }
-        dataState: { $ref: '#/components/schemas/DataState' }
+        providerDisplayName: { type: string, nullable: true, example: null }
+        sourceAuthorized: { type: boolean, default: false }
     ActiveJourney:
       type: object
-      required: [id, optionId, status, dataState]
+      required: [id, optionId, status, dataState, currentLegIndex]
       properties:
         id: { type: string, format: uuid }
         optionId: { type: string, format: uuid }
@@ -857,13 +995,14 @@ components:
         details: { type: object, additionalProperties: true }
     JourneyProgressRequest:
       type: object
+      additionalProperties: false
       properties:
         currentLegIndex: { type: integer, minimum: 0 }
         location: { $ref: '#/components/schemas/GeoPoint' }
         occurredAt: { type: string, format: date-time }
     CommuteProfile:
       type: object
-      required: [id, name, weekdays, targetArrival, enabled]
+      required: [id, name, origin, destination, weekdays, targetArrival, enabled]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -871,6 +1010,7 @@ components:
         destination: { $ref: '#/components/schemas/GeoPoint' }
         weekdays:
           type: array
+          minItems: 1
           items: { type: integer, minimum: 1, maximum: 7 }
         targetArrival: { type: string, format: time }
         enabled: { type: boolean }
@@ -878,11 +1018,12 @@ components:
       type: object
       required: [name, origin, destination, weekdays, targetArrival]
       properties:
-        name: { type: string }
+        name: { type: string, minLength: 1, maxLength: 100 }
         origin: { $ref: '#/components/schemas/GeoPoint' }
         destination: { $ref: '#/components/schemas/GeoPoint' }
         weekdays:
           type: array
+          minItems: 1
           items: { type: integer, minimum: 1, maximum: 7 }
         targetArrival: { type: string, format: time }
     LeaveAlert:
@@ -896,12 +1037,12 @@ components:
       type: object
       required: [scheduledFor]
       properties:
-        commuteProfileId: { type: string, format: uuid }
-        journeyPlanId: { type: string, format: uuid }
+        commuteProfileId: { type: string, format: uuid, nullable: true }
+        journeyPlanId: { type: string, format: uuid, nullable: true }
         scheduledFor: { type: string, format: date-time }
     Notification:
       type: object
-      required: [id, type, title, body, isRead]
+      required: [id, type, title, body, isRead, createdAt]
       properties:
         id: { type: string, format: uuid }
         type: { type: string }
@@ -925,34 +1066,35 @@ components:
       required: [id, createdAt]
       properties:
         id: { type: string, format: uuid }
-        displayName: { type: [string, 'null'] }
-        email: { type: [string, 'null'], format: email }
+        displayName: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
         createdAt: { type: string, format: date-time }
     UserPreferences:
       type: object
       properties:
-        language: { type: string }
-        defaultPreference: { type: string }
+        language: { type: string, example: es }
+        defaultPreference: { type: string, enum: [BALANCED, FASTEST, LESS_WALKING, FEWER_TRANSFERS, RELIABLE] }
         maxWalkMin: { type: integer, minimum: 1, maximum: 60 }
         extraSafetyMarginMin: { type: integer, minimum: 0, maximum: 60 }
         locationConsent: { type: boolean }
     DeviceInstallation:
       type: object
-      required: [id, platform, active]
+      required: [id, installationId, platform, active]
       properties:
         id: { type: string, format: uuid }
+        installationId: { type: string }
         platform: { type: string, enum: [IOS, ANDROID] }
         appVersion: { type: string }
         active: { type: boolean }
-        lastSeenAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time, nullable: true }
     DeviceInstallationInput:
       type: object
       required: [installationId, platform, pushToken]
       properties:
-        installationId: { type: string, maxLength: 160 }
+        installationId: { type: string, minLength: 1, maxLength: 160 }
         platform: { type: string, enum: [IOS, ANDROID] }
-        pushToken: { type: string, writeOnly: true }
-        appVersion: { type: string }
+        pushToken: { type: string, minLength: 1, writeOnly: true }
+        appVersion: { type: string, maxLength: 40 }
     GuestMigrationRequest:
       type: object
       required: [clientDataVersion, items]
@@ -963,7 +1105,7 @@ components:
           items: { type: object, additionalProperties: true }
     GuestMigrationResponse:
       type: object
-      required: [migrationId, importedCount, skippedCount]
+      required: [migrationId, importedCount, skippedCount, idempotentReplay]
       properties:
         migrationId: { type: string, format: uuid }
         importedCount: { type: integer, minimum: 0 }
@@ -976,15 +1118,15 @@ components:
         id: { type: string, format: uuid }
         status: { type: string, enum: [QUEUED, PROCESSING, READY, EXPIRED, FAILED] }
         requestedAt: { type: string, format: date-time }
-        expiresAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time, nullable: true }
     ProviderHealthSnapshot:
       type: object
-      required: [provider, status, checkedAt]
+      required: [provider, capability, status, checkedAt]
       properties:
-        provider: { type: string }
-        capability: { type: string }
+        provider: { type: string, example: authorized-transit-provider }
+        capability: { type: string, example: planning }
         status: { type: string, enum: [HEALTHY, DEGRADED, UNAVAILABLE] }
-        latencyMs: { type: integer, minimum: 0 }
+        latencyMs: { type: integer, minimum: 0, nullable: true }
         checkedAt: { type: string, format: date-time }
     CommunityReport:
       type: object
@@ -1003,9 +1145,18 @@ components:
         details: { type: object, additionalProperties: true }
     Error:
       type: object
-      required: [code, message, traceId]
+      required: [code, message, details, traceId]
       properties:
-        code: { type: string }
-        message: { type: string }
-        details: { type: object, additionalProperties: true }
-        traceId: { type: string }
+        code:
+          type: string
+          example: PROVIDER_TIMEOUT
+        message:
+          type: string
+          example: No fue posible obtener una planificación actualizada.
+        details:
+          type: object
+          additionalProperties: true
+          example: { dataState: DEGRADED, retryable: true }
+        traceId:
+          type: string
+          example: 6f36f44f-5d68-4e37-9074-2a5f9a1e6cf4
