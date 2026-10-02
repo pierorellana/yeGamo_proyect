@@ -1,0 +1,550 @@
+// Derived Prisma Client model for the SQL-first schema.
+// Do not use `prisma migrate` as the source of truth. Apply api/db/migrations
+// first, then run `prisma generate` or `prisma db pull` only to inspect drift.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  issuer                String
+  subject               String
+  email                 String?
+  displayName           String?                @map("display_name")
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime?              @map("deleted_at") @db.Timestamptz(6)
+  preferences           UserPreference?
+  notificationPreferences NotificationPreference?
+  devices              DeviceInstallation[]
+  dataExports           DataExportRequest[]
+  guestMigrationAudits  GuestMigrationAudit[]
+  savedPlaces           SavedPlace[]
+  commuteProfiles       CommuteProfile[]
+  journeyPlans          JourneyPlan[]
+  activeJourneys        ActiveJourney[]
+  leaveAlerts           LeaveAlert[]
+  notifications         Notification[]
+  communityReports      CommunityReport[]
+  reportConfirmations   ReportConfirmation[]
+
+  @@unique([issuer, subject])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model UserPreference {
+  userId                  String   @id @map("user_id") @db.Uuid
+  travelPreference        String   @default("BALANCED") @map("travel_preference")
+  maxWalkMin              Int      @default(15) @map("max_walk_min")
+  extraSafetyMarginMin    Int      @default(0) @map("extra_safety_margin_min")
+  language                String   @default("es")
+  units                   String   @default("METRIC")
+  locationHistoryConsent  Boolean  @default(false) @map("location_history_consent")
+  recurringTripsConsent   Boolean  @default(false) @map("recurring_trips_consent")
+  updatedAt               DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model NotificationPreference {
+  userId              String   @id @map("user_id") @db.Uuid
+  leaveAlertEnabled   Boolean  @default(true) @map("leave_alert_enabled")
+  getoffAlertEnabled  Boolean  @default(true) @map("getoff_alert_enabled")
+  routeChangeEnabled  Boolean  @default(true) @map("route_change_enabled")
+  communityEnabled    Boolean  @default(true) @map("community_enabled")
+  updatedAt           DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model DeviceInstallation {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  installationKey   String   @map("installation_key")
+  platform          String
+  pushToken         String?  @map("push_token")
+  appVersion        String?  @map("app_version")
+  enabled           Boolean  @default(true)
+  lastSeenAt        DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries        NotificationDelivery[]
+
+  @@unique([userId, installationKey])
+  @@index([userId, enabled])
+  @@map("device_installations")
+}
+
+model DataExportRequest {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  status       String   @default("REQUESTED")
+  format       String   @default("JSON")
+  requestedAt  DateTime @default(now()) @map("requested_at") @db.Timestamptz(6)
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz(6)
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz(6)
+  resultRef    String?  @map("result_ref")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, requestedAt])
+  @@map("data_export_requests")
+}
+
+model GuestMigrationAudit {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  idempotencyKey  String   @map("idempotency_key")
+  requestHash     String   @map("request_hash")
+  status          String
+  importedCounts  Json     @map("imported_counts")
+  errorCode       String?  @map("error_code")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@map("guest_migration_audits")
+}
+
+model TransitAgency {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  timezone       String         @default("America/Guayaquil")
+  isDemo         Boolean        @default(false) @map("is_demo")
+  canonicalStatus String        @default("ACTIVE") @map("canonical_status")
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
+  routes         TransitRoute[]
+  stops          TransitStop[]
+
+  @@map("transit_agencies")
+}
+
+model TransitRoute {
+  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agencyId           String?                @map("agency_id") @db.Uuid
+  shortName          String?                @map("short_name")
+  longName           String?                @map("long_name")
+  routeType          String                 @default("BUS") @map("route_type")
+  canonicalStatus    String                 @default("ACTIVE") @map("canonical_status")
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  agency             TransitAgency?         @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  routeStops         RouteStop[]
+  shapes             TransitRouteShape[]
+  journeyLegs        JourneyLeg[]
+  routeObservations  RouteObservation[]
+  routeMetrics       RouteMetric[]
+  communityReports   CommunityReport[]
+
+  @@index([agencyId, canonicalStatus])
+  @@index([shortName])
+  @@map("transit_routes")
+}
+
+model TransitStop {
+  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agencyId           String?                @map("agency_id") @db.Uuid
+  name               String
+  code               String?
+  location           Unsupported("geography(Point,4326)")?
+  canonicalStatus    String                 @default("ACTIVE") @map("canonical_status")
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  agency             TransitAgency?         @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  routeStops         RouteStop[]
+  fromLegs           JourneyLeg[]           @relation("from_stop")
+  toLegs             JourneyLeg[]           @relation("to_stop")
+
+  @@index([agencyId, canonicalStatus])
+  @@index([code])
+  @@map("transit_stops")
+}
+
+model RouteStop {
+  routeId      String       @map("route_id") @db.Uuid
+  stopId       String       @map("stop_id") @db.Uuid
+  directionId  String       @default("0") @map("direction_id")
+  stopSequence Int          @map("stop_sequence")
+  pickupType   String       @default("REGULAR") @map("pickup_type")
+  dropOffType  String       @default("REGULAR") @map("drop_off_type")
+  route        TransitRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stop         TransitStop  @relation(fields: [stopId], references: [id], onDelete: Cascade)
+
+  @@id([routeId, directionId, stopSequence])
+  @@unique([routeId, directionId, stopId, stopSequence])
+  @@index([stopId, routeId])
+  @@map("route_stops")
+}
+
+model ProviderReference {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id") @db.Uuid
+  provider      String
+  externalId   String   @map("external_id")
+  storagePolicy String   @map("storage_policy")
+  lastSeenAt    DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  metadata      Json
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([provider, entityType, externalId])
+  @@index([entityType, entityId])
+  @@index([lastSeenAt])
+  @@index([externalId])
+  @@map("provider_references")
+}
+
+model TransitFeedVersion {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider          String
+  feedName          String               @map("feed_name")
+  version           String
+  storagePolicy     String               @map("storage_policy")
+  status            String               @default("RECEIVED")
+  fetchedAt         DateTime             @default(now()) @map("fetched_at") @db.Timestamptz(6)
+  validFrom         DateTime?            @map("valid_from") @db.Timestamptz(6)
+  validUntil        DateTime?            @map("valid_until") @db.Timestamptz(6)
+  metadata          Json
+  shapes            TransitRouteShape[]
+
+  @@unique([provider, feedName, version])
+  @@index([provider, fetchedAt])
+  @@map("transit_feed_versions")
+}
+
+model TransitRouteShape {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  routeId              String             @map("route_id") @db.Uuid
+  directionId          String             @default("0") @map("direction_id")
+  shape                Unsupported("geometry(LineString,4326)")?
+  sourceFeedVersionId  String?            @map("source_feed_version_id") @db.Uuid
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  route                TransitRoute       @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  sourceFeedVersion    TransitFeedVersion? @relation(fields: [sourceFeedVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([routeId, directionId])
+  @@index([routeId, directionId])
+  @@map("transit_route_shapes")
+}
+
+model JourneyPlan {
+  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String?          @map("user_id") @db.Uuid
+  origin                Unsupported("geography(Point,4326)")?
+  destination           Unsupported("geography(Point,4326)")?
+  timeMode              String           @map("time_mode")
+  requestedTime         DateTime?        @map("requested_time") @db.Timestamptz(6)
+  preference            String           @default("BALANCED")
+  maxWalkMin            Int              @default(15) @map("max_walk_min")
+  extraSafetyMarginMin  Int              @default(0) @map("extra_safety_margin_min")
+  status                String           @default("READY")
+  dataState             String           @default("CURRENT") @map("data_state")
+  recommendedLeaveAt    DateTime?        @map("recommended_leave_at") @db.Timestamptz(6)
+  arrivalWindowFrom     DateTime?        @map("arrival_window_from") @db.Timestamptz(6)
+  arrivalWindowTo       DateTime?        @map("arrival_window_to") @db.Timestamptz(6)
+  providerSummary       Json             @map("provider_summary")
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt             DateTime?        @map("expires_at") @db.Timestamptz(6)
+  user                  User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  options               JourneyOption[]
+  leaveAlerts           LeaveAlert[]
+
+  @@index([userId, createdAt])
+  @@index([dataState, createdAt])
+  @@map("journey_plans")
+}
+
+model JourneyOption {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId             String        @map("plan_id") @db.Uuid
+  rank               Int
+  durationMin        Int           @map("duration_min")
+  walkMin            Int           @default(0) @map("walk_min")
+  transfers          Int           @default(0)
+  reliabilityScore   Int?          @map("reliability_score")
+  reliabilityLevel   String?       @map("reliability_level")
+  sampleSize         Int?          @map("sample_size")
+  provider           String?
+  dataState          String        @default("CURRENT") @map("data_state")
+  payload            Json
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  plan               JourneyPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  legs               JourneyLeg[]
+  activeJourneys     ActiveJourney[]
+
+  @@unique([planId, rank])
+  @@index([planId, rank])
+  @@map("journey_options")
+}
+
+model JourneyLeg {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  optionId       String         @map("option_id") @db.Uuid
+  sequence       Int
+  mode           String
+  routeId        String?        @map("route_id") @db.Uuid
+  fromStopId     String?        @map("from_stop_id") @db.Uuid
+  toStopId       String?        @map("to_stop_id") @db.Uuid
+  departureAt    DateTime?      @map("departure_at") @db.Timestamptz(6)
+  arrivalAt      DateTime?      @map("arrival_at") @db.Timestamptz(6)
+  durationMin    Int            @map("duration_min")
+  distanceM      Int?           @map("distance_m")
+  instruction    String?
+  shape          Unsupported("geometry(LineString,4326)")?
+  dataState      String         @default("CURRENT") @map("data_state")
+  metadata       Json
+  option         JourneyOption  @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  route          TransitRoute?  @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  fromStop       TransitStop?   @relation("from_stop", fields: [fromStopId], references: [id], onDelete: SetNull)
+  toStop         TransitStop?   @relation("to_stop", fields: [toStopId], references: [id], onDelete: SetNull)
+
+  @@unique([optionId, sequence])
+  @@index([routeId, departureAt])
+  @@map("journey_legs")
+}
+
+model ActiveJourney {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String?       @map("user_id") @db.Uuid
+  optionId            String        @map("option_id") @db.Uuid
+  status              String        @default("PLANNED")
+  currentLegSequence  Int?          @map("current_leg_sequence")
+  currentDataState    String        @default("CURRENT") @map("current_data_state")
+  estimatedArrivalAt  DateTime?     @map("estimated_arrival_at") @db.Timestamptz(6)
+  startedAt           DateTime?     @map("started_at") @db.Timestamptz(6)
+  finishedAt          DateTime?     @map("finished_at") @db.Timestamptz(6)
+  actualArrivalAt     DateTime?     @map("actual_arrival_at") @db.Timestamptz(6)
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime      @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user                User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  option              JourneyOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+  events              JourneyEvent[]
+
+  @@index([userId, status, updatedAt])
+  @@index([updatedAt])
+  @@map("active_journeys")
+}
+
+model JourneyEvent {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activeJourneyId String         @map("active_journey_id") @db.Uuid
+  eventType       String         @map("event_type")
+  legSequence     Int?           @map("leg_sequence")
+  occurredAt      DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  source          String?
+  dataState       String         @default("CURRENT") @map("data_state")
+  payload         Json
+  activeJourney   ActiveJourney  @relation(fields: [activeJourneyId], references: [id], onDelete: Cascade)
+
+  @@index([activeJourneyId, occurredAt])
+  @@index([occurredAt])
+  @@map("journey_events")
+}
+
+model SavedPlace {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String       @map("user_id") @db.Uuid
+  label              String
+  location           Unsupported("geography(Point,4326)")?
+  geocodingMetadata  Json         @map("geocoding_metadata")
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime     @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("saved_places")
+}
+
+model CommuteProfile {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String       @map("user_id") @db.Uuid
+  name               String
+  origin             Unsupported("geography(Point,4326)")?
+  destination        Unsupported("geography(Point,4326)")?
+  weekdays           Int[]
+  targetArrival      DateTime     @map("target_arrival") @db.Time(6)
+  timezone           String       @default("America/Guayaquil")
+  preference         String       @default("BALANCED")
+  maxWalkMin         Int          @default(15) @map("max_walk_min")
+  extraMarginMin     Int          @default(0) @map("extra_margin_min")
+  enabled            Boolean      @default(true)
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime     @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaveAlerts        LeaveAlert[]
+
+  @@index([userId, enabled])
+  @@map("commute_profiles")
+}
+
+model LeaveAlert {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  commuteProfileId  String?         @map("commute_profile_id") @db.Uuid
+  journeyPlanId     String?         @map("journey_plan_id") @db.Uuid
+  scheduledFor      DateTime        @map("scheduled_for") @db.Timestamptz(6)
+  status            String          @default("SCHEDULED")
+  idempotencyKey    String          @map("idempotency_key")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  triggeredAt       DateTime?       @map("triggered_at") @db.Timestamptz(6)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commuteProfile    CommuteProfile? @relation(fields: [commuteProfileId], references: [id], onDelete: Cascade)
+  journeyPlan       JourneyPlan?    @relation(fields: [journeyPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([scheduledFor, status])
+  @@map("leave_alerts")
+}
+
+model Notification {
+  id                 String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String                  @map("user_id") @db.Uuid
+  type               String
+  title              String
+  body               String
+  payload            Json
+  isRead             Boolean                 @default(false) @map("is_read")
+  deduplicationKey   String?                 @map("deduplication_key")
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  readAt             DateTime?               @map("read_at") @db.Timestamptz(6)
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries         NotificationDelivery[]
+
+  @@unique([userId, deduplicationKey])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model NotificationDelivery {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  notificationId    String             @map("notification_id") @db.Uuid
+  deviceId          String             @map("device_id") @db.Uuid
+  channel           String
+  status            String             @default("PENDING")
+  provider          String?
+  providerMessageId String?            @map("provider_message_id")
+  deduplicationKey  String             @map("deduplication_key")
+  attemptedAt       DateTime?          @map("attempted_at") @db.Timestamptz(6)
+  deliveredAt       DateTime?          @map("delivered_at") @db.Timestamptz(6)
+  lastError         String?            @map("last_error")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  notification      Notification       @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  device            DeviceInstallation @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, deduplicationKey])
+  @@index([notificationId, status])
+  @@map("notification_deliveries")
+}
+
+model RouteObservation {
+  id                   BigInt        @id @default(autoincrement())
+  routeId              String?       @map("route_id") @db.Uuid
+  directionId          String        @default("0") @map("direction_id")
+  observedAt           DateTime      @map("observed_at") @db.Timestamptz(6)
+  expectedDurationSec  Int?          @map("expected_duration_sec")
+  actualDurationSec    Int?          @map("actual_duration_sec")
+  waitDurationSec      Int?          @map("wait_duration_sec")
+  source               String
+  quality              Decimal?      @db.Decimal(5, 2)
+  metadata             Json
+  expiresAt            DateTime?     @map("expires_at") @db.Timestamptz(6)
+  route                TransitRoute? @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@index([routeId, directionId, observedAt])
+  @@index([expiresAt])
+  @@map("route_observations")
+}
+
+model RouteMetric {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  routeId             String        @map("route_id") @db.Uuid
+  directionId         String        @default("0") @map("direction_id")
+  dayOfWeek           Int           @map("day_of_week")
+  timeBucket          DateTime      @map("time_bucket") @db.Time(6)
+  sampleSize          Int           @map("sample_size")
+  medianDurationSec   Int?          @map("median_duration_sec")
+  p50DurationSec      Int?          @map("p50_duration_sec")
+  p90DurationSec      Int?          @map("p90_duration_sec")
+  dispersionSec       Int?          @map("dispersion_sec")
+  yegamoScore         Int?          @map("yegamo_score")
+  computedAt          DateTime      @default(now()) @map("computed_at") @db.Timestamptz(6)
+  validUntil          DateTime?     @map("valid_until") @db.Timestamptz(6)
+  route               TransitRoute  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@unique([routeId, directionId, dayOfWeek, timeBucket])
+  @@index([routeId, directionId, dayOfWeek, timeBucket])
+  @@map("route_metrics")
+}
+
+model ProviderHealthSnapshot {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider      String
+  capability    String
+  status        String
+  latencyMs     Int?     @map("latency_ms")
+  errorCode     String?  @map("error_code")
+  freshnessAt   DateTime? @map("freshness_at") @db.Timestamptz(6)
+  observedAt    DateTime @default(now()) @map("observed_at") @db.Timestamptz(6)
+  metadata      Json
+
+  @@index([provider, capability, observedAt])
+  @@map("provider_health_snapshots")
+}
+
+model CommunityReport {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String?              @map("user_id") @db.Uuid
+  reportType   String               @map("report_type")
+  location     Unsupported("geography(Point,4326)")?
+  routeId      String?              @map("route_id") @db.Uuid
+  description  String?
+  status       String               @default("ACTIVE")
+  confidence   Decimal              @default(0) @db.Decimal(5, 2)
+  expiresAt    DateTime             @map("expires_at") @db.Timestamptz(6)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  resolvedAt   DateTime?            @map("resolved_at") @db.Timestamptz(6)
+  metadata     Json
+  user         User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  route        TransitRoute?        @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  confirmations ReportConfirmation[]
+
+  @@index([status, expiresAt])
+  @@map("community_reports")
+}
+
+model ReportConfirmation {
+  reportId    String          @map("report_id") @db.Uuid
+  userId      String          @map("user_id") @db.Uuid
+  confirmedAt DateTime        @default(now()) @map("confirmed_at") @db.Timestamptz(6)
+  report      CommunityReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([reportId, userId])
+  @@index([userId, confirmedAt])
+  @@map("report_confirmations")
+}
+
+model RetentionPolicy {
+  tableName         String   @id @map("table_name")
+  timestampColumn   String   @map("timestamp_column")
+  retentionInterval Unsupported("interval")? @map("retention_interval")
+  purpose           String
+  requiresConsent   Boolean  @default(false) @map("requires_consent")
+  enabled           Boolean  @default(true)
+  updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("retention_policies")
+}
