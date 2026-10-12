@@ -22,6 +22,27 @@ Flutter para Android/iOS desde una base de codigo comun. El prototipo actual usa
 16. Avisos
 17. Ajustes
 
+`arrived` es el estado terminal de llegada del módulo de viaje y `nocov` es la
+abreviatura visual de `nocoverage`; ninguno agrega una pantalla a esta
+baseline de 17.
+
+## Comportamiento sin proveedor autorizado
+
+La App no convierte un `503 PROVIDER_UNAVAILABLE` en una ETA local ni muestra
+calles, vehículos, rutas, horarios, nombres de fuente o timestamps del
+prototipo como si fueran actuales. La ausencia de provider se representa como
+estado recuperable `UNAVAILABLE`, con una acción como reintentar, usar origen
+manual o volver.
+
+`LOCATION_OUT_OF_COVERAGE` se mapea a `nocoverage` cuando una fuente autorizada
+existe pero no cubre la ubicación consultada. Los campos de calidad se
+presentan según el API: `providerDisplayName: null`, `sourceAuthorized: false`
+y `observedAt: null` cuando no hay fuente.
+
+`DemoTransitProvider` y el catálogo de fixtures solo pueden activarse con una
+configuración explícita de desarrollo, pruebas o demo marcada. Sus datos deben
+mostrar `DEGRADED`, no `LIVE`, y nunca se cargan por defecto en producción.
+
 ## Arquitectura canonica
 Arquitectura modular inspirada en la estructura existente del proyecto: `env`
 para configuracion y tema, `modules` para capacidades de producto y `shared`

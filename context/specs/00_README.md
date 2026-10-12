@@ -38,7 +38,7 @@ Este paquete actualiza la baseline original de RutaYa al producto **yeGamo** y l
 ## Fuente de verdad
 
 1. Este paquete v1.1 define **comportamiento y contratos**.
-2. El prototipo `yeGamo Prototype.html` define la **referencia visual y de flujo**.
+2. El prototipo `yeGamo-prototipo.html` define la **referencia visual y de flujo**.
 3. La investigacion de fuentes externas permanece fechada al 19-09-2026 y debe revalidarse antes de una decision de produccion.
 
 ## Orden recomendado de lectura

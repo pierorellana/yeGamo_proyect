@@ -75,3 +75,9 @@ requeridos son:
 Cada plan debe leer este cierre y los ADRs antes de modificar código. Las
 migraciones son la fuente ejecutable de datos; `context/specs/14_SCHEMA.sql`
 permanece como referencia derivada versionada.
+
+La reestructuración integral posterior a este cierre se documenta en
+[`RESTRUCTURE-CLOSEOUT.md`](RESTRUCTURE-CLOSEOUT.md). Ese documento registra
+qué partes del runtime fueron implementadas, qué suites pasaron y qué gates
+siguen dependiendo de PostgreSQL/PostGIS, dispositivo Flutter o proveedores
+autorizados.

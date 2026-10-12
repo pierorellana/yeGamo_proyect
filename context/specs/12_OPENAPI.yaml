@@ -2,7 +2,10 @@ openapi: 3.1.0
 info:
   title: yeGamo API
   version: 1.1.1
-  description: Contrato REST/JSON v1 con calidad, frescura e identidad normalizadas.
+  description: >-
+    Contrato REST/JSON v1 con calidad, frescura e identidad normalizadas. Sin
+    provider autorizado, las capacidades dependientes devuelven `503
+    PROVIDER_UNAVAILABLE` con `dataState: UNAVAILABLE`.
 servers:
   - url: /v1
     description: API versionada
@@ -62,6 +65,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/Place' }
         '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
   /places/reverse:
     get:
       tags: [places]
@@ -77,6 +81,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Place' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
   /transit/stops/nearby:
     get:
       tags: [transit]
@@ -670,10 +675,20 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     ProviderUnavailable:
-      description: Proveedor no disponible o sin datos autorizados
+      description: >-
+        Proveedor no disponible o sin datos autorizados. Devuelve
+        `PROVIDER_UNAVAILABLE` con `dataState: UNAVAILABLE` cuando falta una
+        fuente autorizada.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+  headers:
+    TraceId:
+      description: Identificador de correlación de la solicitud.
+      schema: { type: string, minLength: 1, maxLength: 128 }
   schemas:
     GeoPoint:
       type: object
@@ -981,7 +996,7 @@ components:
       type: object
       required: [provider, status, checkedAt]
       properties:
-        provider: { type: string }
+        provider: { type: string, nullable: true, example: null }
         capability: { type: string }
         status: { type: string, enum: [HEALTHY, DEGRADED, UNAVAILABLE] }
         latencyMs: { type: integer, minimum: 0 }
@@ -1003,9 +1018,12 @@ components:
         details: { type: object, additionalProperties: true }
     Error:
       type: object
-      required: [code, message, traceId]
+      required: [code, message, details, traceId]
       properties:
-        code: { type: string }
-        message: { type: string }
-        details: { type: object, additionalProperties: true }
+        code: { type: string, example: PROVIDER_UNAVAILABLE }
+        message: { type: string, example: No existe una fuente autorizada para esta capacidad. }
+        details:
+          type: object
+          additionalProperties: true
+          example: { capability: geocoding, dataState: UNAVAILABLE, retryable: false, sourceAuthorized: false }
         traceId: { type: string }

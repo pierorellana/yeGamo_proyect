@@ -29,7 +29,7 @@ NestJS autentica, autoriza, valida entradas, ejecuta casos de uso y aplica regla
 
 ### Provider Gateway
 
-El gateway consulta adapters autorizados y convierte sus respuestas a modelos canónicos. Decide timeout, fallback, frescura, circuit breaker, licencia de cache y `dataState`. `DemoTransitProvider` solo puede habilitarse en desarrollo, pruebas o demostración marcada; nunca se publica como fuente productiva.
+El gateway consulta adapters autorizados y convierte sus respuestas a modelos canónicos. Decide timeout, fallback, frescura, circuit breaker, licencia de cache y `dataState`. En el estado providerless actual no hay adapter productivo autorizado: una capacidad ausente devuelve `503 PROVIDER_UNAVAILABLE` con `dataState: UNAVAILABLE`, capacidad y trazabilidad; nunca fabrica rutas, lugares, ETA o posiciones. `DemoTransitProvider` solo puede habilitarse con una configuración explícita en desarrollo, pruebas o demostración marcada; sus respuestas son `DEGRADED` y nunca se publican como fuente productiva.
 
 ### Persistencia
 
@@ -46,4 +46,4 @@ request → trace → auth → validación → controller → caso de uso
 → dominio → repositorio/provider gateway → mapper canónico → respuesta `/v1`
 ```
 
-Los errores usan el contrato canónico con `code`, `message`, `details` y `traceId`. Las decisiones de arquitectura que alteren estos límites requieren un ADR.
+Los errores usan el contrato canónico con `code`, `message`, `details` y `traceId`, y conservan `X-Trace-Id` como header de correlación. Las decisiones de arquitectura que alteren estos límites requieren un ADR.

@@ -1,7 +1,23 @@
 # Especificacion de API propia - yeGamo
 
 ## Convenciones
-Base URL `/v1`, JSON, UTC en backend, IDs UUID. Errores: `code`, `message`, `details`, `traceId`.
+Base URL `/v1`, JSON, UTC en backend, IDs UUID. Errores: `code`, `message`, `details`, `traceId`; los errores también conservan `X-Trace-Id` como header de correlación.
+
+## Decisión providerless del MVP
+
+Todavía no existe un proveedor autorizado de transporte o geocodificación. En
+producción, una capacidad que depende de una fuente ausente devuelve HTTP `503`
+con `code: PROVIDER_UNAVAILABLE` y `details.dataState: UNAVAILABLE`; no fabrica
+rutas, lugares, ETA, posiciones, nombres de fuente ni timestamps.
+
+`LOCATION_OUT_OF_COVERAGE` significa que existe una fuente autorizada, pero la
+ubicación consultada está fuera de su cobertura. Es distinto de
+`PROVIDER_UNAVAILABLE` y se presenta en Flutter como `nocoverage`.
+
+`DemoTransitProvider` y los fixtures del prototipo solo se habilitan mediante
+una configuración explícita de desarrollo, pruebas o demo marcada. Sus
+respuestas se clasifican como `DEGRADED`, nunca como `LIVE`; no se cargan por
+defecto en producción.
 
 ## Endpoints principales
 
@@ -98,15 +114,18 @@ instalacion del cliente.
     "reliability":{"score":84,"level":"HIGH","sampleSize":132},
     "dataQuality":{
       "freshness":"CURRENT",
+      "dataState":"CURRENT",
       "liveVehicle":false,
-      "providerDisplayName":null
+      "observedAt":null,
+      "providerDisplayName":null,
+      "sourceAuthorized":false
     },
     "legs":[]
   }]
 }
 ```
 
-`providerDisplayName` solo puede poblarse cuando exista una fuente configurada y autorizada. El prototipo usa nombres de fuentes de demostracion que no deben pasar automaticamente a produccion.
+`providerDisplayName` solo puede poblarse cuando exista una fuente configurada y autorizada. Sin ella, `providerDisplayName` es `null`, `sourceAuthorized` es `false` y `observedAt` es `null`. El prototipo usa nombres de fuentes de demostracion que no deben pasar automaticamente a produccion.
 
 ## Estados de datos
 - `CURRENT`
@@ -132,15 +151,22 @@ Toda respuesta que incluya datos de movilidad puede declarar `dataState` como
 `CURRENT`, `STALE`, `DEGRADED`, `OFFLINE_CACHE` o `UNAVAILABLE`. `LIVE` solo
 puede aparecer junto a una fuente autorizada y un timestamp reciente. Cuando
 no haya datos confiables, el API devuelve el estado o error correspondiente y
-no inventa una ETA.
+no inventa una ETA. Las operaciones de places declaran `503
+ProviderUnavailable` en el contrato cuando no existe la fuente de
+geocodificación.
 
 El error canonico es:
 
 ```json
 {
-  "code": "PROVIDER_TIMEOUT",
-  "message": "No fue posible obtener una planificacion actualizada.",
-  "details": {},
+  "code": "PROVIDER_UNAVAILABLE",
+  "message": "No existe una fuente autorizada para esta capacidad.",
+  "details": {
+    "capability": "geocoding",
+    "dataState": "UNAVAILABLE",
+    "retryable": false,
+    "sourceAuthorized": false
+  },
   "traceId": "uuid-or-trace-value"
 }
 ```

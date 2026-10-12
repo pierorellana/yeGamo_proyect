@@ -24,6 +24,11 @@
 
 ## Contract tests
 Fixtures por proveedor para cambios de schema, ausencia de campos y stale data.
+Debe existir cobertura contractual para `GET /v1/places/search` y
+`GET /v1/places/reverse` cuando no hay geocoder autorizado: respuesta `503`
+`PROVIDER_UNAVAILABLE`, `details.dataState: UNAVAILABLE` y header `X-Trace-Id`.
+También se prueba que `LOCATION_OUT_OF_COVERAGE` no se confunda con ausencia de
+provider y que una respuesta demo opt-in sea `DEGRADED`, nunca `LIVE`.
 
 ## Integracion
 PostgreSQL/PostGIS real en CI; mock controlado de proveedores; FCM/APNs abstraidos.
@@ -54,10 +59,15 @@ PostgreSQL/PostGIS real en CI; mock controlado de proveedores; FCM/APNs abstraid
 11. `OFFLINE_CACHE` presenta cache con frescura visible y `STALE` no se etiqueta
     como actual.
 12. Ninguna respuesta marca `LIVE` sin fuente autorizada y timestamp reciente.
+13. Sin provider autorizado, las operaciones dependientes devuelven
+    `PROVIDER_UNAVAILABLE`/`UNAVAILABLE` sin ETA, fuente ni timestamp inventados.
+14. `arrived` y `nocov` se validan como estados del flujo, sin crear pantallas
+    adicionales.
 
 ## Criterios de salida MVP
-- 100% de las 17 pantallas implementadas o explicitamente feature-flagged segun alcance.
-- >=95% de planes validos devuelven respuesta util en zona piloto cuando la fuente tiene cobertura.
+- 100% de las 17 pantallas implementadas o explicitamente feature-flagged segun alcance; `arrived` y `nocov` permanecen estados.
+- >=95% de planes validos devuelven respuesta util en zona piloto cuando existe una fuente autorizada con cobertura.
+- Sin fuente autorizada, las capacidades dependientes declaran `UNAVAILABLE` y no presentan una respuesta demo como productiva.
 - Ningun vehiculo aparece `LIVE` sin timestamp/fuente autorizada.
 - Estados `OFFLINE_CACHE` y `STALE` se conservan en contrato, mapeo y UI.
 - Ningun nombre de fuente mock del prototipo aparece en produccion sin configuracion real.
