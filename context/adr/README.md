@@ -26,6 +26,7 @@ Estado de la colección: `accepted`
 |---|---|---|---|
 | [ADR-006 — Auth guest/OIDC/JWT](ADR-006-oidc-jwt-authentication.md) | accepted · 2026-10-02 | Invitado, cuenta opcional, JWT y guest migration | `11_API_SPEC.md`, `17_SECURITY_PRIVACY.md` |
 | [ADR-007 — Archivos sensibles](ADR-007-sensitive-files-policy.md) | accepted · 2026-10-02 | Secretos, credenciales, exports, dumps y artefactos locales | `17_SECURITY_PRIVACY.md`, `20_RISKS_ASSUMPTIONS.md` |
+| [ADR-009 — Baseline visual «Bosque claro»](ADR-009-light-prototype-visual-baseline.md) | accepted · 2026-10-12 | Tema claro, iconos SVG, mapa persistente, movimiento | `15_MOBILE_FLUTTER_SPEC.md`, `25_DESIGN_SYSTEM.md` |
 
 ## Decisiones complementarias
 
