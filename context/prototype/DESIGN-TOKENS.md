@@ -1,75 +1,65 @@
 # Design tokens baseline de yeGamo
 
-Estos tokens documentan la referencia visual observada en
-`yeGamo Prototype.html`. Son una base compartida para Flutter; no convierten
+Estos tokens documentan la referencia visual del prototipo
+`yeGamo-prototipo.html` (paquete `yeGamo-prototipo-completo.zip`). Son una base compartida para Flutter; no convierten
 los estilos inline del HTML en un contrato de negocio.
 
 ## Marca y color
 
-La marca visible es `yeGamo`. Usar el logotipo horizontal
-`yegamo-logo.png` cuando haya espacio y el isotipo
-`yegamo-mark-sq.png` en headers, navegación y superficies compactas. No
-mostrar ni reintroducir `RutaYa`.
+La marca visible es `yeGamo`. Símbolo G-recorrido en headers y navegación;
+lockup horizontal cuando haya espacio. No mostrar ni reintroducir `RutaYa`.
+Los tokens ejecutables viven en `yegamo_app/lib/shared/design_system/yg_tokens.dart`
+(generado a partir de `assets/colores-y-tokens/` del paquete del prototipo).
 
 | Token | Valor | Uso |
 |---|---|---|
-| `color.base` | `#0C0C0C` | Fondo oscuro principal y base del mapa. |
-| `color.surface` | `#121212` | Fondo secundario y superficies de baja elevación. |
-| `color.surfaceElevated` | `#252525` | Cards, paneles y elementos elevados discretos. |
-| `color.accent` | `#235E5D` | Acento teal discreto; no debe dominar el fondo general. |
-| `color.textPrimary` | `#F5F5F5` | Texto principal, acción primaria y señal sólida de live. |
-| `color.textSecondary` | `#8C8C8E` | Cuerpo secundario, etiquetas y estado estimado. |
-| `color.textTertiary` | `#9A9A9D` | Texto terciario y estado neutral. |
+| `moss` | `#2C3424` | Botón principal, texto fuerte, ruta elegida. |
+| `cypress` | `#4C583E` | Acción «ir», en vivo, acentos. |
+| `olive` | `#768064` | Caminata, apoyo del fondo. |
+| `cedar` | `#959581` | Estimado, rutas alternativas. |
+| `aloe` | `#DADED8` | Rellenos suaves. |
+| `clay` | `#9C4F3A` | Solo errores y sin cobertura. |
+| `text` / `text2` / `text3` | `#1E2419` / `#5B624F` / `#6E7362` | Jerarquía de texto. |
+| `surface` / `fill` / `border` | `#FFFFFF` / `#EEF0EA` / `#E6E8E1` | Tarjetas, controles, bordes. |
 
-La paleta es deliberadamente oscura y de contraste alto. La variante clara es
-futura; los componentes deben conservar semántica y contraste al cambiar de
-tema.
+Fondo «Bosque claro»: blanco dominante con velo oliva de 13–17 % (`YgBackground`).
+Tema claro como baseline; el oscuro queda como variante futura (ADR-009).
 
 ## Tipografía
 
-Fuente preferida: `SF Pro Display`/`SF Pro Text` en Apple; fallback `Inter`,
-`system-ui`, sans-serif en otras plataformas. La implementación debe permitir
-texto dinámico sin depender de una anchura fija.
+SF Pro Display/Text en Apple; Geist como respaldo en el resto de plataformas.
 
-| Token | Tamaño / peso | Tracking orientativo | Uso |
+| Token | Tamaño / peso | Tracking | Uso |
 |---|---:|---:|---|
-| `type.displayDecision` | `46 / 600` | `-1.2px` | Hora o decisión principal. |
-| `type.metric` | `25 / 600` | `-0.5px` | Métrica principal. |
-| `type.screenTitle` | `21 / 600` | `-0.4px` | Título de pantalla. |
-| `type.label` | `15 / 600` | `-0.2px` | Etiquetas y acciones destacadas. |
-| `type.body` | `15 / 400` | `-0.24px` | Copy funcional. |
-| `type.secondary` | `13 / 400` | `-0.15px` | Contexto y explicación secundaria. |
-| `type.overline` | `11 / 600` | `0.06em` a `0.12em` | Estados y categorías cortas, en mayúsculas. |
+| `heroTime` | `64 / 600` | `-2.56` | Hora de salida. |
+| `summaryTime` | `48 / 600` | `-1.92` | Hora en tarjetas y panel. |
+| `largeTitle` | `28 / 700` | `-0.7` | Título de pantalla. |
+| `title2` | `20 / 600` | `-0.44` | Subtítulos de sección. |
+| `title` | `17 / 600` | `-0.34` | Títulos de fila/panel. |
+| `body` | `15 / 400` | `-0.15` | Copy funcional. |
+| `secondary` | `13 / 400` | `-0.13` | Contexto y explicación. |
+| `overline` | `11 / 600` | `0.66` | Etiquetas en mayúsculas. |
 
 ## Ritmo, radios y ergonomía
 
 | Token | Valor | Uso |
 |---|---:|---|
-| `space.1` | `4px` | Separación de segmentos en barras. |
-| `space.2` | `8px` | Gap entre chips y elementos compactos. |
-| `space.3` | `12px` | Gap entre tarjetas y filas relacionadas. |
-| `space.4` | `20px` | Margen lateral base de pantalla. |
-| `space.5` | `26px` | Separación entre bloques. |
-| `space.touch` | `44px` mínimo | Target táctil accesible. |
-| `radius.banner` | `14px` | Banners y chips grandes. |
-| `radius.card` | `16px` | Cards y superficies principales. |
-| `radius.sheet` | `18px` | Hoja inferior y superficies modales. |
-| `radius.pill` | `9999px` | Pills, inputs y CTA. |
-| `height.pill` | `44–52px` | Botones tipo pill; no reducir el target táctil. |
+| `space` | `4 / 8 / 12 / 16 / 24 / 32` | Escala; margen lateral 16, entre secciones 24. |
+| `radius.card` | `20` | Tarjetas (relleno 16, borde `#E6E8E1`). |
+| `radius.tile` | `10` | Tiles de icono de 36. |
+| `radius.sheet` | `32` | Panel inferior y hojas modales. |
+| `radius.pill` | `9999` | Botones 56/48/36, chips 32, inputs. |
+| `touch` | `44` mínimo | Target táctil accesible. |
 
 ## Componentes y estados
 
-- CTA primario: pill de `color.textPrimary` sobre fondo oscuro; CTA
-  secundario: contorno o superficie tenue.
-- Card: `color.surfaceElevated`, sin sombra fuerte; mantener jerarquía por
-  contraste, espaciado y forma.
-- Banner de estado: contextual, recuperable y no modal para datos parciales,
-  stale, degradados y errores.
-- Chips: preferencia, línea y calidad; deben ser legibles con texto dinámico.
-- Ruta: barra de composición para caminata, espera, transporte, transbordo y
-  margen; lista vertical para pasos y paradas.
-- Navegación: bottom navigation con tab activo de alto contraste y
-  `Semantics` para tabs, botones, progreso y score.
+- Botón primario `moss` sobre claro; secundario `fill`; ghost `cypress`.
+- Tarjeta blanca con borde y sombra suave; filas de 56 con separador a 64.
+- Banner de estado contextual, recuperable y no modal (`warn`/`off`), bajo la
+  barra superior (y = 108) cuando flota.
+- Ruta: barra de composición (caminata punteada, espera rayada, bus, metro,
+  transbordo, margen) y lista vertical de pasos con carril de 28.
+- Navegación: barra de pestañas flotante de vidrio con indicador `moss`.
 
 ### LIVE y ESTIMATED
 

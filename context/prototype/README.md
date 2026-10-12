@@ -2,7 +2,9 @@
 
 ## Propósito y autoridad
 
-`yeGamo Prototype.html` es la referencia de flujo y de jerarquía visual para
+`yeGamo-prototipo.html` (versión «Bosque claro», con su paquete
+`yeGamo-prototipo-completo.zip`: capturas, láminas, videos de animación y assets)
+es la referencia de flujo y de jerarquía visual para
 la implementación móvil. Sirve para validar la secuencia de navegación, las
 17 pantallas, los nueve estados UX y la composición de los componentes; no es
 un contrato de datos ni una fuente productiva.
