@@ -33,6 +33,7 @@ model User {
   notifications         Notification[]
   communityReports      CommunityReport[]
   reportConfirmations   ReportConfirmation[]
+  idempotencyOperations  IdempotencyOperation[]
 
   @@unique([issuer, subject])
   @@index([deletedAt])
@@ -547,4 +548,20 @@ model RetentionPolicy {
   updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 
   @@map("retention_policies")
+}
+
+model IdempotencyOperation {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  principalId     String   @map("principal_id") @db.Uuid
+  operationKey    String   @map("operation_key")
+  requestHash     String   @map("request_hash")
+  responseStatus  Int      @map("response_status")
+  responseBody    Json     @map("response_body")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt       DateTime @map("expires_at") @db.Timestamptz(6)
+  user            User     @relation(fields: [principalId], references: [id], onDelete: Cascade)
+
+  @@unique([principalId, operationKey])
+  @@index([expiresAt])
+  @@map("idempotency_operations")
 }

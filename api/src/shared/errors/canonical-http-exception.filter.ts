@@ -40,18 +40,30 @@ const DEFAULT_MESSAGES: Record<number, string> = {
   [HttpStatus.INTERNAL_SERVER_ERROR]: 'Ocurrió un error interno.',
 };
 
+interface ProviderGatewayFailure {
+  readonly name: 'ProviderGatewayError';
+  readonly code: string;
+  readonly message: string;
+  readonly capability: string;
+  readonly dataState: 'UNAVAILABLE';
+  readonly retryable: boolean;
+}
+
 @Catch()
 export class CanonicalHttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
     const response = http.getResponse<Response>();
     const request = http.getRequest<TraceableRequest>();
-    const status =
+    const providerFailure = asProviderGatewayFailure(exception);
+    const status = providerFailure
+      ? HttpStatus.SERVICE_UNAVAILABLE
+      :
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
-    const traceId = request.traceId ?? resolveTraceId(undefined);
-    const body = this.toCanonicalResponse(exception, status, traceId);
+    const traceId = request.traceId ?? resolveTraceId(request.headers['x-trace-id']);
+    const body = this.toCanonicalResponse(exception, status, traceId, providerFailure);
 
     response.header(TRACE_ID_HEADER, traceId).status(status).json(body);
   }
@@ -60,12 +72,30 @@ export class CanonicalHttpExceptionFilter implements ExceptionFilter {
     exception: unknown,
     status: number,
     traceId: string,
+    providerFailure?: ProviderGatewayFailure,
   ): CanonicalErrorResponse {
+    if (providerFailure !== undefined) {
+      return {
+        code: providerFailure.code,
+        message: providerFailure.message,
+        details: {
+          capability: providerFailure.capability,
+          dataState: providerFailure.dataState,
+          retryable: providerFailure.retryable,
+        },
+        traceId,
+      };
+    }
+
     const exceptionResponse =
       exception instanceof HttpException ? exception.getResponse() : undefined;
     const responseObject = this.asRecord(exceptionResponse);
     const rawMessage = responseObject?.message;
     const details: CanonicalErrorDetails = {};
+
+    if (this.asRecord(responseObject?.details) !== undefined) {
+      Object.assign(details, this.asRecord(responseObject?.details));
+    }
 
     if (Array.isArray(rawMessage)) {
       details.validationErrors = rawMessage;
@@ -74,7 +104,10 @@ export class CanonicalHttpExceptionFilter implements ExceptionFilter {
     }
 
     return {
-      code: ERROR_CODES[status] ?? 'INTERNAL_ERROR',
+      code:
+        typeof responseObject?.code === 'string'
+          ? responseObject.code
+          : ERROR_CODES[status] ?? 'INTERNAL_ERROR',
       message:
         typeof rawMessage === 'string'
           ? rawMessage
@@ -97,4 +130,21 @@ export class CanonicalHttpExceptionFilter implements ExceptionFilter {
 
     return undefined;
   }
+}
+
+function asProviderGatewayFailure(value: unknown): ProviderGatewayFailure | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const candidate = value as Partial<ProviderGatewayFailure>;
+  if (
+    candidate.name !== 'ProviderGatewayError' ||
+    typeof candidate.code !== 'string' ||
+    typeof candidate.message !== 'string' ||
+    typeof candidate.capability !== 'string' ||
+    candidate.dataState !== 'UNAVAILABLE' ||
+    typeof candidate.retryable !== 'boolean'
+  ) {
+    return undefined;
+  }
+
+  return candidate as ProviderGatewayFailure;
 }

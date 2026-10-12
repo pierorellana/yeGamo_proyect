@@ -28,10 +28,11 @@ describeDatabase('SQL-first database migrations', () => {
       '0005',
       '0006',
       '0007',
+      '0008',
     ]);
 
     await expect(verifySchema(databaseUrl)).resolves.toMatchObject({
-      tables: 30,
+      tables: 31,
       spatialColumns: 5,
       stDWithin: true,
     });
@@ -45,7 +46,7 @@ describeDatabase('SQL-first database migrations', () => {
     const ledger = await pool.query<{ count: string }>('SELECT count(*)::text AS count FROM schema_migrations');
     const ledgerRow = ledger.rows[0];
     expect(ledgerRow).toBeDefined();
-    expect(Number(ledgerRow?.count)).toBe(7);
+    expect(Number(ledgerRow?.count)).toBe(8);
   });
 
   it('detects a changed migration checksum before applying later files', async () => {
@@ -70,7 +71,7 @@ describeDatabase('SQL-first database migrations', () => {
 });
 
 describe('database migration artifacts', () => {
-  it('keeps seven ordered migration files and explicit development seeds', async () => {
+  it('keeps eight ordered migration files and explicit development seeds', async () => {
     const migrations = await loadMigrationFiles(resolve(join(__dirname, '../../db/migrations')));
     expect(migrations.map((migration) => migration.version)).toEqual([
       '0001',
@@ -80,6 +81,7 @@ describe('database migration artifacts', () => {
       '0005',
       '0006',
       '0007',
+      '0008',
     ]);
 
     const seeds = await readFile(resolve(join(__dirname, '../../db/seeds/development.sql')), 'utf8');

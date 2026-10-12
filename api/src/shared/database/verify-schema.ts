@@ -31,6 +31,7 @@ const REQUIRED_TABLES = [
   'community_reports',
   'report_confirmations',
   'retention_policies',
+  'idempotency_operations',
 ] as const;
 
 const REQUIRED_INDEXES = [
@@ -40,6 +41,7 @@ const REQUIRED_INDEXES = [
   'transit_route_shapes_shape_gist_idx',
   'journey_legs_shape_gist_idx',
   'active_journeys_one_current_per_user_idx',
+  'idempotency_operations_expiry_idx',
 ] as const;
 
 const SPATIAL_COLUMNS = [

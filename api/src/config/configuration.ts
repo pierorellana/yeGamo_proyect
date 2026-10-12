@@ -5,6 +5,7 @@ export interface AppConfiguration {
   databaseUrl?: string;
   oidcIssuerUrl?: string;
   oidcAudience?: string;
+  oidcJwksUrl?: string;
 }
 
 export function configuration(): AppConfiguration {
@@ -23,5 +24,8 @@ export function configuration(): AppConfiguration {
     ...(process.env.OIDC_AUDIENCE === undefined
       ? {}
       : { oidcAudience: process.env.OIDC_AUDIENCE }),
+    ...(process.env.OIDC_JWKS_URL === undefined
+      ? {}
+      : { oidcJwksUrl: process.env.OIDC_JWKS_URL }),
   };
 }

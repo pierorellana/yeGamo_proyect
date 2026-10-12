@@ -7,12 +7,39 @@ export type DataState =
 
 export type Freshness = 'CURRENT' | 'STALE' | 'UNKNOWN';
 
+export type ProviderCapability =
+  | 'transit'
+  | 'geocoding'
+  | 'vehicle-position'
+  | 'incidents';
+
+export type ProviderStatus = 'HEALTHY' | 'DEGRADED' | 'UNAVAILABLE';
+
+export interface ProviderAvailability {
+  capability: ProviderCapability;
+  status: ProviderStatus;
+  provider: string | null;
+}
+
+export interface ProviderHealthSnapshot extends ProviderAvailability {
+  latencyMs: number | null;
+  checkedAt: string;
+}
+
 export interface DataQuality {
   freshness: Freshness;
   dataState: DataState;
   liveVehicle: boolean;
   observedAt: string | null;
   providerDisplayName: string | null;
+  sourceAuthorized: boolean;
+}
+
+export interface Place {
+  id: string;
+  label: string;
+  location: GeoPoint;
+  source: string | null;
 }
 
 export interface GeoPoint {

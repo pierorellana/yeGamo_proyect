@@ -9,7 +9,7 @@ export class DemoTransitProvider implements TransitPlannerProvider {
   readonly isDemo = true;
 
   constructor(nodeEnv = process.env.NODE_ENV ?? 'development') {
-    if (nodeEnv === 'production') {
+    if (nodeEnv.toLowerCase() === 'production') {
       throw new ProviderGatewayError(
         'PROVIDER_UNAVAILABLE',
         'DemoTransitProvider is disabled in production',
@@ -23,6 +23,7 @@ export class DemoTransitProvider implements TransitPlannerProvider {
       providerKey: this.providerKey,
       isDemo: this.isDemo,
       observedAt: null,
+      sourceAuthorized: false,
       plan: {
         planId: randomUUID(),
         recommendedLeaveAt: request.time ?? null,
