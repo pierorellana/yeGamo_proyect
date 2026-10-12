@@ -4,7 +4,10 @@ info:
   version: 1.1.1
   description: >-
     Contrato REST/JSON versionado para planificación multimodal, movilidad
-    cercana, viajes activos, rutinas, avisos y privacidad.
+    cercana, viajes activos, rutinas, avisos y privacidad. Sin proveedor
+    autorizado, las capacidades dependientes devuelven `503
+    PROVIDER_UNAVAILABLE` con `dataState: UNAVAILABLE`; los fixtures demo
+    requieren configuración explícita fuera de producción.
 servers:
   - url: /v1
     description: API versionada; el host se configura por ambiente.
@@ -68,6 +71,7 @@ paths:
                 items: { $ref: '#/components/schemas/Place' }
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
   /places/reverse:
     get:
       tags: [places]
@@ -84,6 +88,7 @@ paths:
               schema: { $ref: '#/components/schemas/Place' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
   /transit/stops/nearby:
     get:
       tags: [transit]
@@ -600,6 +605,7 @@ paths:
     post:
       tags: [community]
       operationId: createCommunityReport
+      x-implementation-status: post-mvp
       description: Capacidad post-MVP mantenida para compatibilidad contractual.
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKeyRequired' }]
@@ -620,6 +626,7 @@ paths:
     get:
       tags: [community]
       operationId: getNearbyReports
+      x-implementation-status: post-mvp
       security: []
       parameters:
         - { $ref: '#/components/parameters/Latitude' }
@@ -637,6 +644,7 @@ paths:
     post:
       tags: [community]
       operationId: confirmCommunityReport
+      x-implementation-status: post-mvp
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
@@ -647,6 +655,7 @@ paths:
     post:
       tags: [community]
       operationId: resolveCommunityReport
+      x-implementation-status: post-mvp
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/ResourceId' }]
       responses:
@@ -797,7 +806,10 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     ProviderUnavailable:
-      description: Proveedor no disponible o sin datos autorizados.
+      description: >-
+        Proveedor no disponible o sin datos autorizados. Usa
+        `PROVIDER_UNAVAILABLE` y `dataState: UNAVAILABLE` cuando falta una
+        fuente autorizada.
       headers:
         X-Trace-Id:
           $ref: '#/components/headers/TraceId'
@@ -1123,7 +1135,7 @@ components:
       type: object
       required: [provider, capability, status, checkedAt]
       properties:
-        provider: { type: string, example: authorized-transit-provider }
+        provider: { type: string, nullable: true, example: null }
         capability: { type: string, example: planning }
         status: { type: string, enum: [HEALTHY, DEGRADED, UNAVAILABLE] }
         latencyMs: { type: integer, minimum: 0, nullable: true }
@@ -1149,14 +1161,14 @@ components:
       properties:
         code:
           type: string
-          example: PROVIDER_TIMEOUT
+          example: PROVIDER_UNAVAILABLE
         message:
           type: string
-          example: No fue posible obtener una planificación actualizada.
+          example: No existe una fuente autorizada para esta capacidad.
         details:
           type: object
           additionalProperties: true
-          example: { dataState: DEGRADED, retryable: true }
+          example: { capability: geocoding, dataState: UNAVAILABLE, retryable: false, sourceAuthorized: false }
         traceId:
           type: string
           example: 6f36f44f-5d68-4e37-9074-2a5f9a1e6cf4

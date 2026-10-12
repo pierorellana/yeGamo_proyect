@@ -34,3 +34,11 @@ Validación local mínima:
 ```bash
 python3 -c "import yaml; yaml.safe_load(open('api/contracts/openapi.yaml'))"
 ```
+
+La validación de cierre está en
+`../test/contracts/openapi-contract.spec.ts`. Compara las 41 operaciones del
+documento con los decorators runtime, verifica los campos de los modelos,
+estados HTTP, headers de trazabilidad, `Idempotency-Key`, ejemplos JSON y el
+error canónico de proveedor no disponible. Cuatro operaciones de comunidad
+están publicadas como compatibilidad `post-mvp`; el test exige esa marca y no
+las presenta como implementadas.

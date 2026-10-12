@@ -1,9 +1,11 @@
 {
-  "code": "PROVIDER_TIMEOUT",
-  "message": "No fue posible obtener una planificación actualizada.",
+  "code": "PROVIDER_UNAVAILABLE",
+  "message": "No existe una fuente autorizada para esta capacidad.",
   "details": {
-    "dataState": "DEGRADED",
-    "retryable": true
+    "capability": "geocoding",
+    "dataState": "UNAVAILABLE",
+    "retryable": false,
+    "sourceAuthorized": false
   },
   "traceId": "6f36f44f-5d68-4e37-9074-2a5f9a1e6cf4"
 }

@@ -15,7 +15,39 @@ los módulos de aplicación, el worker y las migraciones SQL.
 - El API no almacena contraseñas ni persiste ubicación precisa sin consentimiento.
 - Los datos de demostración del prototipo no son fuentes productivas.
 
-## Organización prevista
+## Verificación local
+
+Desde `api/` y con Node.js `>=20`:
+
+```bash
+npm ci
+npm run typecheck
+npm run build
+npm test -- --runInBand --watchman=false
+npm run db:verify
+```
+
+`npm run db:verify` necesita un `DATABASE_URL` apuntando a PostgreSQL con
+PostGIS y `pgcrypto`. Sin esa variable el comando debe fallar explícitamente;
+no se considera un pase simulado. La suite de migraciones también queda
+omitida por Jest cuando no existe esa precondición.
+
+## Datos demo y proveedores
+
+No hay proveedor autorizado de transporte o geocodificación configurado. En
+producción las capacidades dependientes responden `503
+PROVIDER_UNAVAILABLE`, `dataState: UNAVAILABLE` y `X-Trace-Id`. El adapter
+`DemoTransitProvider` sólo se puede activar de forma explícita fuera de
+producción:
+
+```bash
+NODE_ENV=development DEMO_PROVIDER_ENABLED=true npm run start:dev
+```
+
+No usar esa bandera como configuración productiva ni presentar sus respuestas
+como `LIVE`.
+
+## Organización
 
 ```text
 api/
@@ -26,4 +58,8 @@ api/
 ```
 
 La implementación no debe agregar un controller, estado de error o header sin
-actualizar primero el contrato, el ejemplo afectado y la prueba de contrato.
+actualizar primero el contrato, el ejemplo afectado y la prueba de contrato en
+la misma corrida. El inventario ejecutable está en
+`test/contracts/openapi-contract.spec.ts`; las capacidades de comunidad
+publicadas para compatibilidad están marcadas `post-mvp` y no se cuentan como
+runtime implementado.
