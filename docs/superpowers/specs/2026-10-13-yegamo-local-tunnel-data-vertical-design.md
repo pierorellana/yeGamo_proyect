@@ -35,6 +35,13 @@ dato de usuario se versiona.
   `POST /v1/journeys/plan`.
 - Corrección del flujo Flutter Home para no enviar peticiones protegidas desde
   una sesión invitada y para enviar coordenadas cuando consulte cercanía.
+- Flujo de permiso de ubicación delegado al diálogo nativo del sistema
+  operativo, sin una alerta simulada previa dentro de Flutter.
+- Declaraciones nativas de ubicación `while-in-use` para iOS y Android,
+  necesarias para que `geolocator` pueda solicitar y leer la posición.
+- Radio de consulta de 3000 m cuando `YEGAMO_DEMO_DATA=true`, para cubrir el
+  fixture sintético disperso; en otros entornos se conserva el radio de
+  1000 m.
 - Configuración de Flutter con la URL HTTPS del túnel mediante
   `--dart-define`.
 - Pruebas automatizadas de los límites API/Flutter y verificación manual del
@@ -60,7 +67,7 @@ dato de usuario se versiona.
    paradas demo cercanas a las coordenadas de Guayaquil definidas en el
    fixture.
 3. `GET /v1/health` responde `200`.
-4. `GET /v1/transit/stops/nearby?lat=-2.1700&lon=-79.9000&radiusM=1000`
+4. `GET /v1/transit/stops/nearby?lat=-2.1550&lon=-79.8950&radiusM=3000`
    responde `200` con las paradas demo, sus coordenadas, distancia y
    `dataState: DEGRADED`.
 5. La misma consulta fuera del radio responde una lista vacía, no un error ni
@@ -71,12 +78,18 @@ dato de usuario se versiona.
 7. Una sesión Flutter invitada no provoca `401` por cargar Home, favoritos o
    notificaciones; favoritos y notificaciones permanecen locales hasta que
    exista una sesión autenticada.
-8. Flutter acepta una URL HTTPS del túnel con
+8. El botón de permiso invoca directamente `requestPermission` de la
+   plataforma; Flutter no muestra una alerta que imite el permiso nativo.
+9. Con `YEGAMO_DEMO_DATA=true`, las consultas de cercanía usan el radio máximo
+   permitido de 3000 m sin sustituir las coordenadas reales del dispositivo.
+10. iOS declara `NSLocationWhenInUseUsageDescription` y Android declara
+    `ACCESS_FINE_LOCATION` y `ACCESS_COARSE_LOCATION`.
+11. Flutter acepta una URL HTTPS del túnel con
    `--dart-define=YEGAMO_API_BASE_URL=...` y el iPhone puede consultar el API
    usando datos móviles.
-9. No se versionan `.env`, tokens, credenciales, artefactos generados ni datos
+12. No se versionan `.env`, tokens, credenciales, artefactos generados ni datos
    de usuarios.
-10. Pasan `git diff --check`, typecheck/build/tests del API y
+13. Pasan `git diff --check`, typecheck/build/tests del API y
     `flutter analyze`/tests del cliente aplicables.
 
 ## Diseño técnico
@@ -130,6 +143,26 @@ notificaciones y rutinas continuarán bajo control de sus repositorios:
 
 Esto evita que Home convierta una sesión invitada válida en un estado de error
 por `401` y evita enviar `/transit/stops/nearby` sin `lat` y `lon`.
+
+### Permiso nativo y cobertura del fixture demo
+
+La pantalla Flutter de permisos explica el uso de ubicación y conserva la
+opción de origen manual, pero su acción principal delega directamente en
+`LocationService.requestWhileInUse()`. No se renderiza una alerta que imite el
+diálogo de iOS o Android: el sistema operativo decide el texto, botones y
+momento de la solicitud. La app solo representa el resultado posterior
+(`granted`, `denied`, `deniedForever`, `serviceDisabled` o `restricted`).
+
+Cuando `YEGAMO_DEMO_DATA=true`, `HomeRepository` y `NearbyRepository` siguen
+usando las coordenadas reales concedidas por el sistema, pero envían
+`radiusM=3000` para que el catálogo demo de desarrollo pueda aparecer aunque
+sus dos paradas estén separadas varios kilómetros. Sin esa bandera, el cliente
+usa `radiusM=1000`.
+
+La configuración de plataforma declara únicamente el permiso foreground/
+while-in-use: `NSLocationWhenInUseUsageDescription` en iOS y
+`ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` en Android. No se solicita ni
+se declara ubicación en segundo plano.
 
 La pantalla Nearby conservará su origen manual para poder comprobar el fixture
 de Guayaquil desde cualquier ubicación física. Esta ruta de prueba no concede
