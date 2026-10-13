@@ -47,6 +47,7 @@ class HomeHeader extends StatelessWidget {
                 child: YgGlass(
                   radius: 22,
                   height: 44,
+                  blur: 0,
                   padding: const EdgeInsets.fromLTRB(4, 0, 16, 0),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -103,6 +104,7 @@ class HomeHeader extends StatelessWidget {
                   child: YgIconButton(
                     key: const ValueKey('home_notices'),
                     icon: YgIcons.campana,
+                    style: YgIconButtonStyle.secondary,
                     semanticLabel: 'Avisos',
                     badge: unread,
                     onPressed: onNotices,
@@ -114,6 +116,7 @@ class HomeHeader extends StatelessWidget {
                   child: YgIconButton(
                     key: const ValueKey('home_settings'),
                     icon: YgIcons.usuario,
+                    style: YgIconButtonStyle.secondary,
                     semanticLabel: 'Ajustes y cuenta',
                     onPressed: onSettings,
                   ),
@@ -150,8 +153,7 @@ class HomeDepartureCopy {
       ),
       UxState.offline => HomeDepartureCopy(
         title: title,
-        message:
-            'Sin conexión. No mostramos horarios sin una fuente actual.',
+        message: 'Sin conexión. No mostramos horarios sin una fuente actual.',
         label: const YgSchedLabel(text: 'Sin conexión'),
       ),
       UxState.stale => HomeDepartureCopy(

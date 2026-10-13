@@ -35,9 +35,6 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     _controller = TextEditingController();
-    _focus.addListener(() {
-      if (_focus.hasFocus) _sheet.setSnap(YgSnap.max);
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final vm = context.read<SearchViewModel>();
@@ -73,6 +70,7 @@ class _SearchPageState extends State<SearchPage> {
     }
     setState(() => _searched = text);
     FocusScope.of(context).unfocus();
+    _sheet.setSnap(YgSnap.mid);
     await vm.search();
   }
 
@@ -119,11 +117,13 @@ class _SearchPageState extends State<SearchPage> {
     final saved = context.select<SavedViewModel, List<String>>(
       (s) => s.state.items.map((p) => p.label).toList(growable: false),
     );
-    final visibleBottom = 844 - _sheetB - _sheetH - 16;
+    final visibleBottom =
+        MediaQuery.sizeOf(context).height - _sheetB - _sheetH - 16;
     final showEmpty = state == UxState.empty && _searched != null;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
       body: YgMapBinding(
         view: YgMapView(
           mode: YgMapMode.search,
@@ -140,6 +140,7 @@ class _SearchPageState extends State<SearchPage> {
                 fit: StackFit.expand,
                 children: [
                   YgSheet(
+                    key: const ValueKey('search_sheet'),
                     config: YgSheetConfig.search,
                     controller: _sheet,
                     onHeightChanged: (h, b) {
@@ -174,7 +175,7 @@ class _SearchPageState extends State<SearchPage> {
                       ),
                     ),
                     body: (context, snap) => SingleChildScrollView(
-                      physics: snap == YgSnap.max
+                      physics: snap == YgSnap.max || _searched != null
                           ? const ClampingScrollPhysics()
                           : const NeverScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
@@ -192,10 +193,7 @@ class _SearchPageState extends State<SearchPage> {
                           ),
                           if (saved.isNotEmpty) ...[
                             const SizedBox(height: 12),
-                            SearchQuickChips(
-                              labels: saved,
-                              onPick: _useQuery,
-                            ),
+                            SearchQuickChips(labels: saved, onPick: _useQuery),
                           ],
                           const SizedBox(height: 16),
                           YgGroup(
@@ -206,9 +204,9 @@ class _SearchPageState extends State<SearchPage> {
                                 title: 'Usar origen manual',
                                 subtitle: 'Elige tú el punto de partida',
                                 showChevron: true,
-                                onTap: () => Navigator.of(
-                                  context,
-                                ).pushNamed(AppRoutes.planner),
+                                onTap: () =>
+                                    Navigator.of(context)
+                                        .pushNamed(AppRoutes.planner),
                               ),
                             ],
                           ),
@@ -260,12 +258,17 @@ class _SearchPageState extends State<SearchPage> {
                   key: ValueKey('result_${result.id}'),
                   icon: YgIcons.ubicacion,
                   title: result.name,
-                  subtitle: 'Resultado de una fuente autorizada',
+                  subtitle: result.source == 'openstreetmap-nominatim'
+                      ? 'OpenStreetMap · lugar geocodificado'
+                      : result.dataState == DataState.degraded
+                      ? 'Datos limitados'
+                      : 'Lugar encontrado',
                   trailing: result.dataState == DataState.current
                       ? null
                       : YgFreshnessLabel(result.dataState),
                   onTap: () =>
-                      Navigator.of(context).pushNamed(AppRoutes.planner),
+                      Navigator.of(context)
+                          .pushNamed(AppRoutes.planner, arguments: result),
                 ),
             ],
           ),

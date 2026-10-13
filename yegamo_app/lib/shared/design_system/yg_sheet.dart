@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
@@ -99,7 +97,9 @@ class _YgSheetState extends State<YgSheet> with TickerProviderStateMixin {
     vsync: this,
     duration: const Duration(milliseconds: 650),
   );
-  late final AnimationController _h = AnimationController.unbounded(vsync: this);
+  late final AnimationController _h = AnimationController.unbounded(
+    vsync: this,
+  );
   late YgSheetController _ctl;
   bool _ownsCtl = false;
   DateTime _justDragged = DateTime.fromMillisecondsSinceEpoch(0);
@@ -173,7 +173,7 @@ class _YgSheetState extends State<YgSheet> with TickerProviderStateMixin {
   void _dragUpdate(DragUpdateDetails d) {
     final c = widget.config;
     var h = _h.value - d.delta.dy;
-    
+
     _h
       ..stop()
       ..value = h.clamp(c.min - 40, c.max + 24);
@@ -300,29 +300,22 @@ class _SheetSurface extends StatelessWidget {
       decoration: BoxDecoration(borderRadius: r, boxShadow: YgShadows.sheet),
       child: ClipRRect(
         borderRadius: r,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            height: height,
-            decoration: BoxDecoration(
-              borderRadius: r,
-              border: Border.all(
-                color: YgColors.moss.withValues(alpha: .08),
-                width: .5,
-              ),
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xF7FFFFFF),
-                  Color(0xF7FFFFFF),
-                  Color(0xF7F6F8F2),
-                ],
-                stops: [0, .55, 1],
-              ),
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: r,
+            border: Border.all(
+              color: YgColors.moss.withValues(alpha: .08),
+              width: .5,
             ),
-            child: Material(type: MaterialType.transparency, child: child),
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xF7FFFFFF), Color(0xF7FFFFFF), Color(0xF7F6F8F2)],
+              stops: [0, .55, 1],
+            ),
           ),
+          child: Material(type: MaterialType.transparency, child: child),
         ),
       ),
     );
@@ -358,10 +351,7 @@ Future<T?> showYgModalSheet<T>(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(
-                  height: 20,
-                  child: Center(child: _Grabber()),
-                ),
+                const SizedBox(height: 20, child: Center(child: _Grabber())),
                 Flexible(child: builder(context)),
               ],
             ),
@@ -484,6 +474,7 @@ class YgTabBar extends StatelessWidget {
         height: YgSize.tabbarHeight,
         padding: const EdgeInsets.all(4),
         opacity: .9,
+        blur: 0,
         child: LayoutBuilder(
           builder: (context, c) {
             final w = c.maxWidth / items.length;
@@ -608,6 +599,7 @@ class YgTopBar extends StatelessWidget {
                 icon: backIcon,
                 onPressed: onBack,
                 semanticLabel: backLabel,
+                style: YgIconButtonStyle.secondary,
               ),
             if (onBack != null) const SizedBox(width: 8),
             if (title != null)
@@ -618,6 +610,7 @@ class YgTopBar extends StatelessWidget {
                     radius: 22,
                     height: 44,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
+                    blur: 0,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
@@ -640,9 +633,9 @@ class YgTopBar extends StatelessWidget {
                   ),
                 ),
               ),
-            if (leading != null) leading!,
+            ?leading,
             const Spacer(),
-            if (trailing != null) trailing!,
+            ?trailing,
           ],
         ),
       ),

@@ -38,6 +38,7 @@ class YgMapTopRow extends StatelessWidget {
               message: 'Volver',
               child: YgIconButton(
                 icon: YgIcons.atras,
+                style: YgIconButtonStyle.secondary,
                 semanticLabel: 'Volver',
                 onPressed: onBack,
               ),
@@ -50,6 +51,7 @@ class YgMapTopRow extends StatelessWidget {
                   radius: 22,
                   height: 44,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
+                  blur: 0,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
@@ -77,6 +79,7 @@ class YgMapTopRow extends StatelessWidget {
                 message: trailingLabel ?? '',
                 child: YgIconButton(
                   icon: trailingIcon!,
+                  style: YgIconButtonStyle.secondary,
                   semanticLabel: trailingLabel ?? '',
                   onPressed: onTrailing,
                 ),

@@ -44,6 +44,7 @@ class YgMapControls extends StatelessWidget {
               YgGlass(
                 radius: 22,
                 width: 44,
+                blur: 0,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -69,12 +70,14 @@ class YgMapControls extends StatelessWidget {
               YgIconButton(
                 icon: YgIcons.navegar,
                 semanticLabel: 'Centrar en mi ubicación',
+                style: YgIconButtonStyle.secondary,
                 onPressed: ctl.reset,
               ),
               const SizedBox(height: 8),
               YgIconButton(
                 icon: YgIcons.recorridoCompleto,
                 semanticLabel: 'Ver recorrido completo',
+                style: YgIconButtonStyle.secondary,
                 selected: fitSelected,
                 onPressed: onFit,
               ),

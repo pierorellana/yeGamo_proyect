@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 
 import '../../../shared/design_system/yg_components.dart';
@@ -181,25 +179,22 @@ class _FixedSheet extends StatelessWidget {
       decoration: BoxDecoration(borderRadius: r, boxShadow: YgShadows.sheet),
       child: ClipRRect(
         borderRadius: r,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            height: height,
-            decoration: BoxDecoration(
-              borderRadius: r,
-              border: Border.all(
-                color: YgColors.moss.withValues(alpha: .08),
-                width: .5,
-              ),
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xF7FFFFFF), Color(0xF7FFFFFF), Color(0xF7F6F8F2)],
-                stops: [0, .55, 1],
-              ),
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: r,
+            border: Border.all(
+              color: YgColors.moss.withValues(alpha: .08),
+              width: .5,
             ),
-            child: Material(type: MaterialType.transparency, child: child),
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xF7FFFFFF), Color(0xF7FFFFFF), Color(0xF7F6F8F2)],
+              stops: [0, .55, 1],
+            ),
           ),
+          child: Material(type: MaterialType.transparency, child: child),
         ),
       ),
     );

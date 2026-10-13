@@ -103,9 +103,7 @@ OptionTimes timesFor(JourneyPlan plan, JourneyOption option) {
     to = legArr;
   }
   return OptionTimes(
-    departure: isRecommended
-        ? (plan.recommendedLeaveAt ?? legDep)
-        : legDep,
+    departure: isRecommended ? (plan.recommendedLeaveAt ?? legDep) : legDep,
     arrivalFrom: from,
     arrivalTo: to,
   );
@@ -348,6 +346,7 @@ class PlannerFlowBar extends StatelessWidget {
       radius: 22,
       height: 44,
       padding: const EdgeInsets.fromLTRB(14, 0, 16, 0),
+      blur: 0,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -400,6 +399,7 @@ class PlannerFlowBar extends StatelessWidget {
                 icon: YgIcons.atras,
                 semanticLabel: 'Volver',
                 onPressed: onBack,
+                style: YgIconButtonStyle.secondary,
               ),
             )
           else
@@ -765,54 +765,54 @@ class PlannerStaticSheet extends StatelessWidget {
       child: YgEnter(
         kind: YgEnterKind.fade,
         child: DecoratedBox(
-          decoration: BoxDecoration(borderRadius: r, boxShadow: YgShadows.sheet),
+          decoration: BoxDecoration(
+            borderRadius: r,
+            boxShadow: YgShadows.sheet,
+          ),
           child: ClipRRect(
             borderRadius: r,
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                height: height,
-                decoration: BoxDecoration(
-                  borderRadius: r,
-                  border: Border.all(
-                    color: YgColors.moss.withValues(alpha: .08),
-                    width: .5,
-                  ),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xF7FFFFFF),
-                      Color(0xF7FFFFFF),
-                      Color(0xF7F6F8F2),
-                    ],
-                    stops: [0, .55, 1],
-                  ),
+            child: Container(
+              height: height,
+              decoration: BoxDecoration(
+                borderRadius: r,
+                border: Border.all(
+                  color: YgColors.moss.withValues(alpha: .08),
+                  width: .5,
                 ),
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: Column(
-                    children: [
-                      const SizedBox(
-                        height: 24,
-                        child: Center(
-                          child: SizedBox(
-                            width: 36,
-                            height: 5,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: YgColors.handle,
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(3),
-                                ),
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xF7FFFFFF),
+                    Color(0xF7FFFFFF),
+                    Color(0xF7F6F8F2),
+                  ],
+                  stops: [0, .55, 1],
+                ),
+              ),
+              child: Material(
+                type: MaterialType.transparency,
+                child: Column(
+                  children: [
+                    const SizedBox(
+                      height: 24,
+                      child: Center(
+                        child: SizedBox(
+                          width: 36,
+                          height: 5,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: YgColors.handle,
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(3),
                               ),
                             ),
                           ),
                         ),
                       ),
-                      Expanded(child: child),
-                    ],
-                  ),
+                    ),
+                    Expanded(child: child),
+                  ],
                 ),
               ),
             ),

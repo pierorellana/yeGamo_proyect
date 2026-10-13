@@ -35,14 +35,38 @@ class _BgPainter extends CustomPainter {
           stops: [0, .42, 1],
         ).createShader(rect),
     );
-    _glow(canvas, size, Offset(size.width, 0), size.width * 1.2,
-        size.height * .55, const Color(0xFF959581), .13, .58);
-    _glow(canvas, size, Offset(0, size.height), size.width * 1.3,
-        size.height * .6, const Color(0xFF768064), .17, .62);
+    _glow(
+      canvas,
+      size,
+      Offset(size.width, 0),
+      size.width * 1.2,
+      size.height * .55,
+      const Color(0xFF959581),
+      .13,
+      .58,
+    );
+    _glow(
+      canvas,
+      size,
+      Offset(0, size.height),
+      size.width * 1.3,
+      size.height * .6,
+      const Color(0xFF768064),
+      .17,
+      .62,
+    );
   }
 
-  void _glow(Canvas canvas, Size size, Offset c, double rx, double ry,
-      Color color, double a, double stop) {
+  void _glow(
+    Canvas canvas,
+    Size size,
+    Offset c,
+    double rx,
+    double ry,
+    Color color,
+    double a,
+    double stop,
+  ) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     canvas.translate(c.dx, c.dy);
@@ -92,28 +116,29 @@ class YgGlass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = BorderRadius.circular(radius);
-    return DecoratedBox(
-      decoration: BoxDecoration(borderRadius: r, boxShadow: shadow),
-      child: ClipRRect(
+    final surface = Container(
+      width: width,
+      height: height,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: opacity),
         borderRadius: r,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: blur / 2, sigmaY: blur / 2),
-          child: Container(
-            width: width,
-            height: height,
-            padding: padding,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: opacity),
-              borderRadius: r,
-              border: Border.all(
-                color: YgColors.moss.withValues(alpha: .1),
-                width: .5,
-              ),
-            ),
-            child: child,
-          ),
+        border: Border.all(
+          color: YgColors.moss.withValues(alpha: .1),
+          width: .5,
         ),
       ),
+      child: child,
+    );
+    final content = blur > 0
+        ? BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: blur / 2, sigmaY: blur / 2),
+            child: surface,
+          )
+        : surface;
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: r, boxShadow: shadow),
+      child: ClipRRect(borderRadius: r, child: content),
     );
   }
 }
@@ -294,8 +319,10 @@ class YgListRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            if (leading != null) ...[leading!, const SizedBox(width: 12)]
-            else if (icon != null) ...[
+            if (leading != null) ...[
+              leading!,
+              const SizedBox(width: 12),
+            ] else if (icon != null) ...[
               YgTile(icon: icon!, tone: tone),
               const SizedBox(width: 12),
             ],
@@ -322,10 +349,7 @@ class YgListRow extends StatelessWidget {
             ),
             if (value != null) ...[
               const SizedBox(width: 12),
-              Text(
-                value!,
-                style: YgText.body.copyWith(color: YgColors.text3),
-              ),
+              Text(value!, style: YgText.body.copyWith(color: YgColors.text3)),
             ],
             if (trailing != null) ...[const SizedBox(width: 12), trailing!],
             if (showChevron) ...[

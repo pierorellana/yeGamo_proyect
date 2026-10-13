@@ -12,6 +12,7 @@ class SearchViewModel extends ChangeNotifier {
   final SearchRepository _repository;
   String _query = '';
   bool _loading = false;
+  int _requestVersion = 0;
   SearchSnapshot _snapshot = const SearchSnapshot(state: UxState.empty);
 
   String get query => _query;
@@ -19,10 +20,10 @@ class SearchViewModel extends ChangeNotifier {
   SearchSnapshot get snapshot => _snapshot;
 
   Future<void> loadRecents() async {
-    _snapshot = SearchSnapshot(
-      state: UxState.empty,
-      recentQueries: await _repository.recentQueries(),
-    );
+    final version = ++_requestVersion;
+    final recents = await _repository.recentQueries();
+    if (version != _requestVersion) return;
+    _snapshot = SearchSnapshot(state: UxState.empty, recentQueries: recents);
     notifyListeners();
   }
 
@@ -32,6 +33,7 @@ class SearchViewModel extends ChangeNotifier {
   }
 
   Future<void> search([String? value]) async {
+    final version = ++_requestVersion;
     if (value != null) {
       _query = value;
     }
@@ -41,7 +43,9 @@ class SearchViewModel extends ChangeNotifier {
       recentQueries: _snapshot.recentQueries,
     );
     notifyListeners();
-    _snapshot = await _repository.search(_query);
+    final snapshot = await _repository.search(_query);
+    if (version != _requestVersion) return;
+    _snapshot = snapshot;
     _loading = false;
     notifyListeners();
   }

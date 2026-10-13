@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../shared/location/location_service.dart';
 import '../../../shared/models/data_state.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/connectivity_service.dart';
@@ -11,14 +12,21 @@ class SearchRepository {
     required ApiClient apiClient,
     required ConnectivityService connectivity,
     required LocalStorage storage,
-  }) : this._(apiClient, connectivity, storage);
+    LocationService? locationService,
+  }) : this._(apiClient, connectivity, storage, locationService);
 
-  SearchRepository._(this._apiClient, this._connectivity, this._storage);
+  SearchRepository._(
+    this._apiClient,
+    this._connectivity,
+    this._storage,
+    this._locationService,
+  );
 
   static const recentsKey = 'search_recent_queries';
   final ApiClient _apiClient;
   final ConnectivityService _connectivity;
   final LocalStorage _storage;
+  final LocationService? _locationService;
 
   Future<List<String>> recentQueries() async {
     final raw = await _storage.read(recentsKey);
@@ -42,9 +50,16 @@ class SearchRepository {
       return SearchSnapshot(state: UxState.offline, recentQueries: recents);
     }
 
+    final queryParameters = <String, String>{'q': trimmed};
+    final position = await _locationService?.currentPosition();
+    if (position != null) {
+      queryParameters['lat'] = position.latitude.toString();
+      queryParameters['lon'] = position.longitude.toString();
+    }
+
     final response = await _apiClient.get<Object?>(
       'places/search',
-      query: <String, String>{'q': trimmed},
+      query: queryParameters,
     );
     if (!response.isSuccess) {
       final error = response.error;
