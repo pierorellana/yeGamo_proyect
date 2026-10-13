@@ -6,6 +6,7 @@ import { ProviderGatewayError } from '../../src/provider-gateway/domain/provider
 import { GeocodingProvider, TransitPlannerProvider } from '../../src/provider-gateway/domain/provider.ports';
 import { JourneyPlanRequest } from '../../src/provider-gateway/domain/provider.types';
 import { createTransitProviders } from '../../src/provider-gateway/provider-gateway.module';
+import { DEFAULT_GEOCODING_TIMEOUT_MS } from '../../src/provider-gateway/application/geocoding-gateway.service';
 import { CanonicalHttpExceptionFilter } from '../../src/shared/errors/canonical-http-exception.filter';
 
 const request: JourneyPlanRequest = {
@@ -16,6 +17,10 @@ const request: JourneyPlanRequest = {
 };
 
 describe('provider gateway', () => {
+  it('allows the public geocoder enough time for the development tunnel', () => {
+    expect(DEFAULT_GEOCODING_TIMEOUT_MS).toBe(5000);
+  });
+
   it('returns canonical unavailable semantics when transit has no provider', async () => {
     await expect(new TransitGatewayService([]).plan(request)).rejects.toMatchObject({
       code: 'PROVIDER_UNAVAILABLE',
@@ -196,6 +201,7 @@ describe('provider gateway', () => {
         label: 'Centro de Guayaquil',
         location: request.origin,
         source: null,
+        dataState: 'DEGRADED',
       },
     ]);
   });

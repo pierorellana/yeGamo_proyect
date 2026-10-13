@@ -15,7 +15,7 @@ describe('favorites service', () => {
 
   it('replays the same response for the same idempotency key', async () => {
     let calls = 0;
-    const repo: FavoritePlacesRepository = { list: async () => [], create: async () => { calls += 1; return { id: 'p-1', label: 'Casa', location: { lat: -2.17, lon: -79.9 }, source: null }; }, update: jest.fn(), delete: async () => false };
+    const repo: FavoritePlacesRepository = { list: async () => [], create: async () => { calls += 1; return { id: 'p-1', label: 'Casa', location: { lat: -2.17, lon: -79.9 }, source: null, dataState: 'DEGRADED' }; }, update: jest.fn(), delete: async () => false };
     const identity = { requireLocationConsent: async () => undefined };
     const service = new FavoritesService(repo, identity as never, new IdempotencyService(new InMemoryIdempotencyStore()));
     const input = { label: 'Casa', location: { lat: -2.17, lon: -79.9 } };

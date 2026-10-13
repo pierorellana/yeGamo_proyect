@@ -40,6 +40,7 @@ export interface Place {
   label: string;
   location: GeoPoint;
   source: string | null;
+  dataState: DataState;
 }
 
 export interface GeoPoint {

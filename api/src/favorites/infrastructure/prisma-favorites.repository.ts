@@ -43,5 +43,11 @@ export class PrismaFavoritePlacesRepository implements FavoritePlacesRepository 
 }
 
 function toPlace(row: PlaceRow): Place {
-  return { id: row.id, label: row.label, location: { lat: Number(row.lat), lon: Number(row.lon) }, source: null };
+  return {
+    id: row.id,
+    label: row.label,
+    location: { lat: Number(row.lat), lon: Number(row.lon) },
+    source: null,
+    dataState: 'DEGRADED',
+  };
 }

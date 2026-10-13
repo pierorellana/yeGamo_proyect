@@ -149,6 +149,7 @@ describe('places canonical success mapping', () => {
             label: 'Centro de Guayaquil',
             location: { lat: -2.17, lon: -79.9 },
             source: 'authorized-geocoder',
+            dataState: 'CURRENT',
           },
         ]);
         expect(body[0]).not.toHaveProperty('providerKey');

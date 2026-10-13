@@ -32,16 +32,84 @@ PostGIS y `pgcrypto`. Sin esa variable el comando debe fallar explícitamente;
 no se considera un pase simulado. La suite de migraciones también queda
 omitida por Jest cuando no existe esa precondición.
 
+## Arranque local con PostgreSQL/PostGIS
+
+El archivo `api/.env` es local y está ignorado por git. Para una instalación
+de Homebrew con PostgreSQL escuchando en `127.0.0.1:5432`, usa:
+
+```dotenv
+NODE_ENV=development
+PORT=3000
+APP_VERSION=1.1.1
+DATABASE_URL=postgresql://127.0.0.1:5432/yegamo
+NOMINATIM_ENABLED=true
+NOMINATIM_USER_AGENT=yeGamo-local-dev/1.0
+```
+
+Desde `api/`, carga esas variables y aplica el esquema:
+
+```bash
+set -a
+source .env
+set +a
+npm run db:migrate
+npm run db:verify
+```
+
+El runner de migraciones no ejecuta datos demo automáticamente. Para cargar el
+catálogo sintético solo en desarrollo:
+
+```bash
+PGOPTIONS='-c yegamo.seed_mode=development' \
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/seeds/development.sql
+```
+
+El API puede arrancar con el proveedor demo explícito:
+
+```bash
+NODE_ENV=development \
+DEMO_PROVIDER_ENABLED=true \
+NOMINATIM_ENABLED=true \
+NOMINATIM_USER_AGENT='yeGamo-local-dev/1.0' \
+npm run start:dev
+```
+
+## Acceso desde un iPhone por datos móviles
+
+En VS Code, abre la vista **Ports**, reenvía el puerto `3000`, cambia la
+visibilidad a **Public** y copia la URL HTTPS generada. La app Flutter ya
+acepta esa URL por configuración de compilación; no la guardes en el repositorio:
+
+```bash
+export YEGAMO_TUNNEL_URL='https://URL_PUBLICA_COPIADA_DE_VS_CODE'
+cd ../yegamo_app
+fvm flutter run -d 00008140-001461680A7B801C \
+  --dart-define=YEGAMO_ENV=development \
+  --dart-define=YEGAMO_DEMO_DATA=true \
+  --dart-define=YEGAMO_REAL_MAP=true \
+  --dart-define=YEGAMO_API_BASE_URL="$YEGAMO_TUNNEL_URL"
+```
+
+La URL debe ser HTTPS y el proceso NestJS debe permanecer activo mientras se
+usa el túnel. El cliente Flutter nativo no requiere CORS.
+
 ## Datos demo y proveedores
 
-No hay proveedor autorizado de transporte o geocodificación configurado. En
-producción las capacidades dependientes responden `503
+Nominatim es el proveedor público de geocodificación habilitado en desarrollo
+por defecto. En producción debe habilitarse explícitamente con un
+`NOMINATIM_USER_AGENT` propio. Las búsquedas son manuales, están limitadas a
+una solicitud por segundo y no implementan autocompletado. En producción las
+capacidades dependientes responden `503
 PROVIDER_UNAVAILABLE`, `dataState: UNAVAILABLE` y `X-Trace-Id`. El adapter
 `DemoTransitProvider` sólo se puede activar de forma explícita fuera de
 producción:
 
 ```bash
-NODE_ENV=development DEMO_PROVIDER_ENABLED=true npm run start:dev
+NODE_ENV=development \
+DEMO_PROVIDER_ENABLED=true \
+NOMINATIM_ENABLED=true \
+NOMINATIM_USER_AGENT='yeGamo-local-dev/1.0' \
+npm run start:dev
 ```
 
 No usar esa bandera como configuración productiva ni presentar sus respuestas

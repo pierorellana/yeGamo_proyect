@@ -6,7 +6,7 @@ import { GeoPoint, Place } from '../domain/provider.types';
 
 export const GEOCODING_PROVIDERS = Symbol('GEOCODING_PROVIDERS');
 
-const DEFAULT_GEOCODING_TIMEOUT_MS = 2000;
+export const DEFAULT_GEOCODING_TIMEOUT_MS = 5000;
 
 @Injectable()
 export class GeocodingGatewayService {
@@ -93,6 +93,10 @@ function mapPlaces(result: ProviderResult<unknown>, providerKey: string): Place[
         !result.isDemo && result.sourceAuthorized === true
           ? result.providerKey
           : null,
+      dataState:
+        !result.isDemo && result.sourceAuthorized === true
+            ? 'CURRENT'
+            : 'DEGRADED',
     };
   });
 }

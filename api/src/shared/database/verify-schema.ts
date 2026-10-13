@@ -101,7 +101,7 @@ export async function verifySchema(databaseUrl = process.env.DATABASE_URL): Prom
     }
 
     const spatialResult = await pool.query<{ table_name: string; column_name: string; type_name: string }>(
-      `SELECT c.table_name, c.column_name, postgis_typmod_type(a.atttypmod) AS type_name
+      `SELECT c.table_name, c.column_name, format_type(a.atttypid, a.atttypmod) AS type_name
          FROM information_schema.columns c
          JOIN pg_catalog.pg_attribute a
            ON a.attrelid = format('%I.%I', c.table_schema, c.table_name)::regclass

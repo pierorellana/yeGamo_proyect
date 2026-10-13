@@ -7,6 +7,7 @@ import { AppModule } from '../../src/app.module';
 import {
   TRANSIT_READ_PORT,
   TransitReadPort,
+  UnavailableTransitReadPort,
 } from '../../src/transit/domain/transit.ports';
 
 async function createApp(port?: TransitReadPort): Promise<INestApplication> {
@@ -25,7 +26,7 @@ describe('transit HTTP API', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    app = await createApp();
+    app = await createApp(new UnavailableTransitReadPort());
   });
 
   afterAll(async () => {

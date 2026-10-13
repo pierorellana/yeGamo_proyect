@@ -843,12 +843,13 @@ components:
         traceId: { type: string, example: health-7c7c8d }
     Place:
       type: object
-      required: [id, label, location]
+      required: [id, label, location, dataState]
       properties:
-        id: { type: string, format: uuid }
+        id: { type: string }
         label: { type: string, example: Centro de Guayaquil }
         location: { $ref: '#/components/schemas/GeoPoint' }
         source: { type: string, nullable: true, example: null }
+        dataState: { $ref: '#/components/schemas/DataState' }
     PlaceInput:
       type: object
       additionalProperties: false

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { DemoTransitProvider } from './adapters/demo-transit.provider';
+import { NominatimGeocodingProvider } from './adapters/nominatim-geocoding.provider';
 import { GeocodingGatewayService, GEOCODING_PROVIDERS } from './application/geocoding-gateway.service';
 import { ProviderHealthService } from './application/provider-health.service';
 import { TransitGatewayService, TRANSIT_PLANNER_PROVIDERS } from './application/transit-gateway.service';
@@ -25,7 +26,28 @@ import { IdentityModule } from '../identity/identity.module';
     },
     {
       provide: GEOCODING_PROVIDERS,
-      useValue: [] as GeocodingProvider[],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): GeocodingProvider[] => {
+        const nodeEnv = config.get<string>('nodeEnv', process.env.NODE_ENV ?? 'development');
+        const configured = config.get<string>('NOMINATIM_ENABLED');
+        const enabled = configured === undefined
+          ? nodeEnv.toLowerCase() !== 'production'
+          : configured === 'true';
+        if (!enabled) return [];
+
+        const userAgent = config.get<string>('NOMINATIM_USER_AGENT');
+        if (nodeEnv.toLowerCase() === 'production' && !userAgent) return [];
+
+        return [
+          new NominatimGeocodingProvider({
+            baseUrl: config.get<string>(
+              'NOMINATIM_BASE_URL',
+              'https://nominatim.openstreetmap.org',
+            ),
+            userAgent: userAgent ?? 'yeGamo-local-dev/1.0',
+          }),
+        ];
+      },
     },
     TransitGatewayService,
     GeocodingGatewayService,
