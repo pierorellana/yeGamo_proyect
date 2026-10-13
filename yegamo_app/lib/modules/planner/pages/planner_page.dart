@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../shared/design_system/yg_components.dart';
 import '../../../shared/map/yg_map_view.dart';
 import '../../../shared/navigation/app_routes.dart';
+import '../../search/models/search_models.dart';
 import '../models/planner_models.dart';
 import '../providers/planner_view_model.dart';
 import '../widgets/planner_common.dart';
@@ -25,6 +26,9 @@ class _PlannerPageState extends State<PlannerPage> {
   int _day = 0;
   int _minutes = 0;
   String? _inputError;
+  JourneyPoint? _argumentDestination;
+  String? _argumentDestinationLabel;
+  bool _routeArgumentsRead = false;
 
   static const _margins = [0, 5, 10, 15];
 
@@ -32,7 +36,8 @@ class _PlannerPageState extends State<PlannerPage> {
   void initState() {
     super.initState();
     _originController = TextEditingController()..addListener(_refresh);
-    _destinationController = TextEditingController()..addListener(_refresh);
+    _destinationController = TextEditingController()
+      ..addListener(_onDestinationChanged);
     final vm = context.read<PlannerViewModel>();
     final now = DateTime.now();
     final saved = vm.targetTime;
@@ -47,6 +52,21 @@ class _PlannerPageState extends State<PlannerPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_routeArgumentsRead) return;
+    _routeArgumentsRead = true;
+    final arguments = ModalRoute.of(context)?.settings.arguments;
+    if (arguments is! PlaceResult) return;
+    _argumentDestination = JourneyPoint(
+      latitude: arguments.latitude,
+      longitude: arguments.longitude,
+    );
+    _argumentDestinationLabel = arguments.name;
+    _destinationController.text = arguments.name;
+  }
+
+  @override
   void dispose() {
     _originController.dispose();
     _destinationController.dispose();
@@ -55,6 +75,13 @@ class _PlannerPageState extends State<PlannerPage> {
 
   void _refresh() {
     if (mounted) setState(() {});
+  }
+
+  void _onDestinationChanged() {
+    if (_argumentDestinationLabel != _destinationController.text) {
+      _argumentDestination = null;
+    }
+    _refresh();
   }
 
   DateTime get _target {
@@ -74,7 +101,8 @@ class _PlannerPageState extends State<PlannerPage> {
 
   Future<void> _calculate() async {
     final origin = _parse(_originController.text);
-    final destination = _parse(_destinationController.text);
+    final destination =
+        _parse(_destinationController.text) ?? _argumentDestination;
     if (origin == null || destination == null) {
       setState(
         () => _inputError = 'Indica origen y destino como latitud, longitud.',
@@ -338,7 +366,7 @@ class _PlannerPageState extends State<PlannerPage> {
           child: YgButton(
             key: const ValueKey('planner_calculate'),
             label: 'Calcular salida',
-                        expand: true,
+            expand: true,
             onPressed: _calculate,
           ),
         ),
@@ -506,7 +534,10 @@ class _OdRow extends StatelessWidget {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.,\-\s]')),
                     ],
-                    style: YgText.sub.copyWith(height: 1.3, letterSpacing: -.15),
+                    style: YgText.sub.copyWith(
+                      height: 1.3,
+                      letterSpacing: -.15,
+                    ),
                     decoration: const InputDecoration(
                       isDense: true,
                       isCollapsed: true,

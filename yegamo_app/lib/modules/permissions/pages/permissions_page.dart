@@ -10,11 +10,12 @@ import '../../../shared/navigation/app_routes.dart';
 import '../../onboarding/widgets/entry_frame.dart';
 import '../models/permission_models.dart';
 import '../providers/permission_view_model.dart';
-import '../widgets/ios_location_dialog.dart';
 import '../widgets/permission_radar.dart';
 
-/// 03-permisos: radar sobre el mapa atenuado, hoja inferior y, al pulsar
-/// «Permitir ubicación», el diálogo estilo iOS (21) previo a la solicitud real.
+/// 03-permisos: radar sobre el mapa atenuado y hoja inferior.
+///
+/// La acción principal delega directamente en el permiso nativo del sistema
+/// operativo; esta pantalla solo explica el uso y ofrece el origen manual.
 class PermissionsPage extends StatefulWidget {
   const PermissionsPage({super.key});
 
@@ -23,10 +24,7 @@ class PermissionsPage extends StatefulWidget {
 }
 
 class _PermissionsPageState extends State<PermissionsPage> {
-  bool _dialog = false;
-
   Future<void> _request() async {
-    setState(() => _dialog = false);
     await context.read<PermissionViewModel>().request();
     if (!mounted) return;
     final state = context.read<PermissionViewModel>().state;
@@ -37,11 +35,6 @@ class _PermissionsPageState extends State<PermissionsPage> {
 
   void _continueManually() {
     Navigator.of(context).pushReplacementNamed(AppRoutes.root);
-  }
-
-  void _deny() {
-    setState(() => _dialog = false);
-    _continueManually();
   }
 
   @override
@@ -66,9 +59,8 @@ class _PermissionsPageState extends State<PermissionsPage> {
                 duration: reduced
                     ? YgMotion.reduced
                     : const Duration(milliseconds: 600),
-                builder: (context, v, _) => ColoredBox(
-                  color: YgColors.page.withValues(alpha: v),
-                ),
+                builder: (context, v, _) =>
+                    ColoredBox(color: YgColors.page.withValues(alpha: v)),
               ),
             ),
             YgEnter(
@@ -93,7 +85,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
                         denied: denied,
                         error: error,
                         requesting: requesting,
-                        onAllow: () => setState(() => _dialog = true),
+                        onAllow: _request,
                         onManual: _continueManually,
                       ),
                     ),
@@ -101,14 +93,6 @@ class _PermissionsPageState extends State<PermissionsPage> {
                 ),
               ),
             ),
-            if (_dialog)
-              ProtoFrame(
-                child: IosLocationDialog(
-                  onOnce: _request,
-                  onAllow: _request,
-                  onDeny: _deny,
-                ),
-              ),
           ],
         ),
       ),
@@ -306,8 +290,7 @@ class _Sheet extends StatelessWidget {
           ),
         if (error)
           const YgBanner(
-            title:
-                'No pudimos consultar el permiso. Puedes reintentar o continuar manualmente.',
+            title: 'No pudimos consultar el permiso. Puedes reintentar o continuar manualmente.',
             icon: YgIcons.alerta,
             tone: YgBannerTone.off,
           ),

@@ -1,11 +1,17 @@
 enum AppEnvironment { development, staging, production }
 
 class AppConfig {
+  static const defaultMapStyleUrl =
+      'https://tiles.openfreemap.org/styles/positron';
+
   const AppConfig({
     this.apiBaseUrl = 'http://localhost:3000',
     this.environment = AppEnvironment.development,
     this.demoDataEnabled = false,
     this.reduceMotion = false,
+    this.realMapEnabled = false,
+    this.mapStyleUrl = '',
+    this.mapTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     this.requestTimeout = const Duration(seconds: 15),
     this.maxRetries = 1,
   });
@@ -27,6 +33,18 @@ class AppConfig {
       'YEGAMO_API_BASE_URL',
       defaultValue: 'http://localhost:3000',
     );
+    const realMapEnabled = bool.fromEnvironment(
+      'YEGAMO_REAL_MAP',
+      defaultValue: true,
+    );
+    const mapStyleUrl = String.fromEnvironment(
+      'YEGAMO_MAP_STYLE_URL',
+      defaultValue: '',
+    );
+    const mapTileUrl = String.fromEnvironment(
+      'YEGAMO_MAP_TILE_URL',
+      defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    );
 
     final environment = AppEnvironment.values.firstWhere(
       (value) => value.name == rawEnvironment,
@@ -39,6 +57,9 @@ class AppConfig {
       demoDataEnabled:
           requestedDemoData && environment != AppEnvironment.production,
       reduceMotion: reduceMotion,
+      realMapEnabled: realMapEnabled,
+      mapStyleUrl: mapStyleUrl,
+      mapTileUrl: mapTileUrl,
     );
   }
 
@@ -46,6 +67,9 @@ class AppConfig {
   final AppEnvironment environment;
   final bool demoDataEnabled;
   final bool reduceMotion;
+  final bool realMapEnabled;
+  final String mapStyleUrl;
+  final String mapTileUrl;
   final Duration requestTimeout;
   final int maxRetries;
 

@@ -8,6 +8,7 @@ class PlaceResult {
     required this.latitude,
     required this.longitude,
     required this.dataState,
+    this.source,
   });
 
   final String id;
@@ -15,6 +16,7 @@ class PlaceResult {
   final double latitude;
   final double longitude;
   final DataState dataState;
+  final String? source;
 
   factory PlaceResult.fromJson(Map<String, Object?> json) {
     final location = json['location'] is Map
@@ -22,11 +24,15 @@ class PlaceResult {
         : const <String, Object?>{};
     return PlaceResult(
       id: json['id'] as String? ?? 'unknown',
-      name: json['name'] as String? ?? 'Lugar sin nombre',
+      name:
+          json['label'] as String? ??
+          json['name'] as String? ??
+          'Lugar sin nombre',
       latitude: _number(location['lat'] ?? json['lat']) ?? 0,
       longitude: _number(location['lon'] ?? json['lon']) ?? 0,
       dataState:
           DataStateParsing.fromApiValue(json['dataState']) ?? DataState.current,
+      source: json['source'] as String?,
     );
   }
 

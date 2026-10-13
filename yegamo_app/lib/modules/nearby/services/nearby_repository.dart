@@ -1,3 +1,4 @@
+import '../../../env/config/app_config.dart';
 import '../../../shared/location/location_service.dart';
 import '../../../shared/models/data_state.dart';
 import '../../../shared/services/api_client.dart';
@@ -9,17 +10,22 @@ class NearbyRepository {
     required ApiClient apiClient,
     required ConnectivityService connectivity,
     required LocationService locationService,
-  }) : this._(apiClient, connectivity, locationService);
+    AppConfig config = const AppConfig(),
+  }) : this._(apiClient, connectivity, locationService, config);
 
   NearbyRepository._(
     this._apiClient,
     this._connectivity,
     this._locationService,
+    this._config,
   );
 
   final ApiClient _apiClient;
   final ConnectivityService _connectivity;
   final LocationService _locationService;
+  final AppConfig _config;
+
+  String get _nearbyRadiusM => _config.demoDataEnabled ? '3000' : '1000';
 
   Future<NearbySnapshot> load({GeoCoordinate? manualOrigin}) async {
     final position = manualOrigin ?? await _locationService.currentPosition();
@@ -32,7 +38,7 @@ class NearbyRepository {
       );
     }
     if (!await _connectivity.isOnline) {
-      return const NearbySnapshot(state: UxState.offline);
+      return NearbySnapshot(state: UxState.offline, origin: position);
     }
 
     final response = await _apiClient.get<Object?>(
@@ -40,7 +46,7 @@ class NearbyRepository {
       query: <String, String>{
         'lat': position.latitude.toString(),
         'lon': position.longitude.toString(),
-        'radiusM': '1000',
+        'radiusM': _nearbyRadiusM,
       },
     );
     if (!response.isSuccess) {
@@ -59,6 +65,7 @@ class NearbyRepository {
     return NearbySnapshot(
       state: stops.isEmpty ? UxState.empty : UxState.ok,
       stops: stops,
+      origin: position,
     );
   }
 

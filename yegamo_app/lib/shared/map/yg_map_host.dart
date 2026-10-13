@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../env/config/app_config.dart';
+import '../../modules/nearby/providers/nearby_view_model.dart';
+import '../../modules/search/providers/search_view_model.dart';
+import '../location/location_service.dart';
+import '../models/data_state.dart';
 import 'yg_map.dart';
+import 'yg_real_map.dart';
 import 'yg_map_view.dart';
 
 /// Mapa persistente bajo el `Navigator` (se monta en `MaterialApp.builder`).
@@ -17,16 +22,44 @@ class YgMapHost extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = context.read<YgMapScope>();
     final config = context.read<AppConfig>();
+    final nearby = context.watch<NearbyViewModel>().snapshot;
+    final search = context.watch<SearchViewModel>().snapshot;
+    final points = <YgMapPoint>[
+      for (final stop in nearby.stops)
+        if (stop.latitude != null && stop.longitude != null)
+          YgMapPoint(
+            id: stop.id,
+            latitude: stop.latitude!,
+            longitude: stop.longitude!,
+            kind: YgMapPointKind.stop,
+            dataState: stop.dataState.apiValue,
+          ),
+      for (final place in search.results)
+        YgMapPoint(
+          id: place.id,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          kind: YgMapPointKind.place,
+          dataState: place.dataState.apiValue,
+        ),
+    ];
     return Stack(
       fit: StackFit.expand,
       children: [
         ListenableBuilder(
           listenable: scope,
-          builder: (context, _) => YgMap(
-            view: scope.view,
-            controller: scope.controller,
-            showDemoOverlays: config.demoDataEnabled,
-          ),
+          builder: (context, _) => config.realMapEnabled
+              ? YgRealMap(
+                  view: scope.view,
+                  config: config,
+                  locationService: context.read<LocationService>(),
+                  points: points,
+                )
+              : YgMap(
+                  view: scope.view,
+                  controller: scope.controller,
+                  showDemoOverlays: config.demoDataEnabled,
+                ),
         ),
         ?child,
       ],

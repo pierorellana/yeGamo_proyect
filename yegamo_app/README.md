@@ -35,12 +35,49 @@ desarrollo se puede activar explícitamente:
 ```bash
 flutter run \
   --dart-define=YEGAMO_ENV=development \
-  --dart-define=YEGAMO_DEMO_DATA=true
+  --dart-define=YEGAMO_DEMO_DATA=true \
+  --dart-define=YEGAMO_REAL_MAP=true
 ```
 
 `YEGAMO_DEMO_DATA` no se acepta cuando `YEGAMO_ENV=production`. La App no
 autoriza por sí misma una fuente de transporte, no publica `LIVE` sin fuente y
 timestamp, y no persiste ubicación precisa sin consentimiento.
+
+El mapa real usa MapLibre con un fallback raster de OpenStreetMap por defecto,
+sin API key, para evitar que un estilo remoto deje la superficie en blanco. El
+estilo y la URL de tiles se pueden cambiar en tiempo de ejecución. OpenFreeMap
+Positron queda disponible como estilo remoto opcional:
+
+```bash
+fvm flutter run \
+  --dart-define=YEGAMO_REAL_MAP=true \
+  --dart-define=YEGAMO_MAP_STYLE_URL=https://URL_DEL_ESTILO_MAPLIBRE \
+  --dart-define=YEGAMO_MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png
+```
+
+La búsqueda de lugares es manual, no autocompletado. El backend consulta
+Nominatim respetando su límite de una solicitud por segundo y muestra la
+fuente/estado recibido.
+
+## API local mediante túnel HTTPS
+
+Para probar el iPhone conectado por datos móviles, levanta el API con el
+proveedor demo en desarrollo, reenvía el puerto `3000` desde la vista **Ports**
+de VS Code con visibilidad **Public** y copia la URL HTTPS. Después ejecuta:
+
+```bash
+export YEGAMO_TUNNEL_URL='https://URL_PUBLICA_COPIADA_DE_VS_CODE'
+fvm flutter run -d 00008140-001461680A7B801C \
+  --dart-define=YEGAMO_ENV=development \
+  --dart-define=YEGAMO_DEMO_DATA=true \
+  --dart-define=YEGAMO_REAL_MAP=true \
+  --dart-define=YEGAMO_API_BASE_URL="$YEGAMO_TUNNEL_URL"
+```
+
+`YEGAMO_API_BASE_URL` solo se inyecta en la ejecución y no debe guardarse en
+este repositorio. En sesión invitada, favoritos, rutinas y notificaciones se
+mantienen en almacenamiento local; las capacidades que requieren identidad
+OIDC no se simulan.
 
 ## Estructura
 

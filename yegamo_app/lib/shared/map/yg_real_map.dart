@@ -1,0 +1,282 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
+
+import '../../env/config/app_config.dart';
+import '../design_system/yg_tokens.dart';
+import '../location/location_service.dart';
+import 'yg_map_style.dart';
+import 'yg_map_view.dart';
+
+class YgMapPoint {
+  const YgMapPoint({
+    required this.id,
+    required this.latitude,
+    required this.longitude,
+    required this.kind,
+    required this.dataState,
+  });
+
+  final String id;
+  final double latitude;
+  final double longitude;
+  final YgMapPointKind kind;
+  final String dataState;
+}
+
+enum YgMapPointKind { stop, place }
+
+class YgRealMap extends StatefulWidget {
+  const YgRealMap({
+    super.key,
+    required this.view,
+    required this.config,
+    required this.locationService,
+    this.points = const <YgMapPoint>[],
+  });
+
+  final YgMapView view;
+  final AppConfig config;
+  final LocationService locationService;
+  final List<YgMapPoint> points;
+
+  @override
+  State<YgRealMap> createState() => _YgRealMapState();
+}
+
+class _YgRealMapState extends State<YgRealMap> {
+  static const _fallbackCenter = GeoCoordinate(
+    latitude: -2.1700,
+    longitude: -79.9000,
+  );
+
+  MapLibreMapController? _controller;
+  Timer? _styleFallbackTimer;
+  GeoCoordinate _center = _fallbackCenter;
+  bool _locationGranted = false;
+  bool _styleLoaded = false;
+  bool _dynamicLayersAdded = false;
+  bool _mapUnavailable = false;
+  bool _usingFallbackStyle = false;
+
+  bool get _hasRemoteStyle => widget.config.mapStyleUrl.trim().isNotEmpty;
+
+  bool get _usesFallbackStyle => !_hasRemoteStyle || _usingFallbackStyle;
+
+  String get _styleString => _usesFallbackStyle
+      ? YgMapStyle.fallback(tileUrl: widget.config.mapTileUrl)
+      : widget.config.mapStyleUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocation();
+    _scheduleStyleFallback();
+  }
+
+  @override
+  void didUpdateWidget(covariant YgRealMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.view.locOn && widget.view.locOn) _loadLocation();
+    if (oldWidget.points != widget.points) _updateSources();
+  }
+
+  void _scheduleStyleFallback() {
+    if (!_hasRemoteStyle) return;
+    _styleFallbackTimer = Timer(const Duration(seconds: 8), () {
+      if (!mounted || _styleLoaded || _usingFallbackStyle) return;
+      setState(() {
+        _usingFallbackStyle = true;
+        _styleLoaded = false;
+        _dynamicLayersAdded = false;
+        _mapUnavailable = false;
+      });
+    });
+  }
+
+  Future<void> _loadLocation() async {
+    if (!widget.view.locOn) return;
+    final position = await widget.locationService.currentPosition();
+    if (!mounted || position == null) return;
+    _locationGranted = true;
+    _center = position;
+    final controller = _controller;
+    if (controller != null) {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(position.latitude, position.longitude),
+          13,
+        ),
+      );
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _onMapCreated(MapLibreMapController controller) {
+    _controller = controller;
+  }
+
+  Future<void> _onStyleLoaded() async {
+    _styleFallbackTimer?.cancel();
+    _styleLoaded = true;
+    final controller = _controller;
+    if (controller == null) return;
+    try {
+      if (!_usesFallbackStyle && !_dynamicLayersAdded) {
+        await controller.addGeoJsonSource(
+          'yegamo-stops',
+          _featureCollection(YgMapPointKind.stop),
+        );
+        await controller.addGeoJsonSource(
+          'yegamo-places',
+          _featureCollection(YgMapPointKind.place),
+        );
+        await controller.addCircleLayer(
+          'yegamo-stops',
+          'yegamo-stops-layer',
+          const CircleLayerProperties(
+            circleRadius: 7,
+            circleColor: '#4C583E',
+            circleStrokeColor: '#FFFFFF',
+            circleStrokeWidth: 2,
+          ),
+        );
+        await controller.addCircleLayer(
+          'yegamo-places',
+          'yegamo-places-layer',
+          const CircleLayerProperties(
+            circleRadius: 8,
+            circleColor: '#9C4F3A',
+            circleStrokeColor: '#FFFFFF',
+            circleStrokeWidth: 2,
+          ),
+        );
+        _dynamicLayersAdded = true;
+      }
+      await _updateSources();
+    } on Exception {
+      if (mounted) setState(() => _mapUnavailable = true);
+    }
+  }
+
+  Future<void> _updateSources() async {
+    if (!_styleLoaded) return;
+    final controller = _controller;
+    if (controller == null) return;
+    if (!_usesFallbackStyle && !_dynamicLayersAdded) return;
+    try {
+      await controller.setGeoJsonSource(
+        'yegamo-stops',
+        _featureCollection(YgMapPointKind.stop),
+      );
+      await controller.setGeoJsonSource(
+        'yegamo-places',
+        _featureCollection(YgMapPointKind.place),
+      );
+    } on Exception {
+      if (mounted) setState(() => _mapUnavailable = true);
+    }
+  }
+
+  Map<String, dynamic> _featureCollection(YgMapPointKind kind) {
+    return <String, dynamic>{
+      'type': 'FeatureCollection',
+      'features': widget.points
+          .where((point) => point.kind == kind)
+          .map(
+            (point) => <String, dynamic>{
+              'type': 'Feature',
+              'id': point.id,
+              'geometry': <String, dynamic>{
+                'type': 'Point',
+                'coordinates': <double>[point.longitude, point.latitude],
+              },
+              'properties': <String, dynamic>{
+                'kind': point.kind.name,
+                'dataState': point.dataState,
+              },
+            },
+          )
+          .toList(growable: false),
+    };
+  }
+
+  @override
+  void dispose() {
+    _styleFallbackTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Mapa real de yeGamo',
+      container: true,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          MapLibreMap(
+            styleString: _styleString,
+            initialCameraPosition: CameraPosition(
+              target: LatLng(_center.latitude, _center.longitude),
+              zoom: 12.5,
+            ),
+            onMapCreated: _onMapCreated,
+            onStyleLoadedCallback: _onStyleLoaded,
+            myLocationEnabled: _locationGranted && widget.view.locOn,
+            logoEnabled: false,
+            compassEnabled: false,
+            attributionButtonPosition: AttributionButtonPosition.bottomLeft,
+            attributionButtonMargins: const Point<num>(16, 44),
+            foregroundLoadColor: Colors.transparent,
+          ),
+          if (_usesFallbackStyle)
+            const Positioned(
+              left: 12,
+              bottom: 8,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Color(0xCCF4F5F1),
+                    borderRadius: BorderRadius.all(Radius.circular(4)),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    child: Text(
+                      '© OpenStreetMap contributors',
+                      style: TextStyle(fontSize: 10, color: YgColors.text2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_mapUnavailable)
+            const Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Color(0xEEF4F5F1),
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text(
+                      'El mapa no está disponible en este momento.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: YgColors.text2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

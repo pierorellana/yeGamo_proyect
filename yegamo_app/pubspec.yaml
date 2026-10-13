@@ -39,6 +39,7 @@ dependencies:
   flutter_secure_storage: ^10.1.0
   geolocator: ^14.0.1
   http: ^1.6.0
+  maplibre_gl: ^0.27.1
   provider: ^6.1.5
   shared_preferences: ^2.5.3
 

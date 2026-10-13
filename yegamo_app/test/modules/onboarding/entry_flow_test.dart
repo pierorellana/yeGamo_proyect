@@ -44,20 +44,21 @@ Future<void> _loadGeist() async {
 void main() {
   setUpAll(_loadGeist);
 
-  testWidgets('splash muestra el pie de demostración solo con datos demo y se salta con un toque', (
-    tester,
-  ) async {
-    await _pumpApp(tester, config: const AppConfig(demoDataEnabled: true));
-    expect(find.byKey(const ValueKey('splash_continue')), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 3000));
-    expect(find.text('GUAYAQUIL · DATOS DE DEMOSTRACIÓN'), findsOneWidget);
-    expect(find.text('Sal a tiempo.'), findsOneWidget);
+  testWidgets(
+    'splash muestra el pie de demostración solo con datos demo y se salta con un toque',
+    (tester) async {
+      await _pumpApp(tester, config: const AppConfig(demoDataEnabled: true));
+      expect(find.byKey(const ValueKey('splash_continue')), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 3000));
+      expect(find.text('GUAYAQUIL · DATOS DE DEMOSTRACIÓN'), findsOneWidget);
+      expect(find.text('Sal a tiempo.'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('splash_continue')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.byKey(const ValueKey('onboarding_pages')), findsOneWidget);
-  });
+      await tester.tap(find.byKey(const ValueKey('splash_continue')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const ValueKey('onboarding_pages')), findsOneWidget);
+    },
+  );
 
   testWidgets('splash sin datos demo omite el pie y avanza solo a los 3,5 s', (
     tester,
@@ -70,31 +71,32 @@ void main() {
     expect(find.byKey(const ValueKey('onboarding_pages')), findsOneWidget);
   });
 
-  testWidgets('onboarding: tres páginas, atrás colapsa en la primera y Saltar se oculta en la última', (
-    tester,
-  ) async {
-    await _pumpApp(tester, config: const AppConfig(reduceMotion: true));
-    await tester.pumpAndSettle();
-    expect(find.text('Sabe cuándo salir'), findsOneWidget);
-    expect(find.text('Continuar'), findsOneWidget);
-    expect(find.byKey(const ValueKey('onboarding_skip')), findsOneWidget);
+  testWidgets(
+    'onboarding: tres páginas, atrás colapsa en la primera y Saltar se oculta en la última',
+    (tester) async {
+      await _pumpApp(tester, config: const AppConfig(reduceMotion: true));
+      await tester.pumpAndSettle();
+      expect(find.text('Sabe cuándo salir'), findsOneWidget);
+      expect(find.text('Continuar'), findsOneWidget);
+      expect(find.byKey(const ValueKey('onboarding_skip')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('onboarding_next')));
-    await tester.pumpAndSettle();
-    expect(find.text('Contigo de puerta a puerta'), findsOneWidget);
-    expect(find.byKey(const ValueKey('onboarding_back')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('onboarding_next')));
+      await tester.pumpAndSettle();
+      expect(find.text('Contigo de puerta a puerta'), findsOneWidget);
+      expect(find.byKey(const ValueKey('onboarding_back')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('onboarding_next')));
-    await tester.pumpAndSettle();
-    expect(find.text('Rangos honestos, no promesas'), findsOneWidget);
-    expect(find.text('Empezar'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('onboarding_next')));
+      await tester.pumpAndSettle();
+      expect(find.text('Rangos honestos, no promesas'), findsOneWidget);
+      expect(find.text('Empezar'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('onboarding_back')));
-    await tester.pumpAndSettle();
-    expect(find.text('Contigo de puerta a puerta'), findsOneWidget);
-  });
+      await tester.tap(find.byKey(const ValueKey('onboarding_back')));
+      await tester.pumpAndSettle();
+      expect(find.text('Contigo de puerta a puerta'), findsOneWidget);
+    },
+  );
 
-  testWidgets('onboarding completo lleva a permisos y el diálogo iOS precede a la solicitud', (
+  testWidgets('onboarding completo delega el permiso al sistema operativo', (
     tester,
   ) async {
     final storage = InMemoryLocalStorage();
@@ -115,19 +117,12 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('permission_allow')));
     await tester.pumpAndSettle();
-    expect(find.text('¿Permitir que “yeGamo” use tu ubicación?'), findsOneWidget);
-    // El permiso real todavía no se solicitó.
-    expect(await storage.read('location_permission_result'), isNull);
-
-    await tester.tap(find.byKey(const ValueKey('permission_dialog_allow')));
-    await tester.pumpAndSettle();
     expect(await storage.read('location_permission_result'), 'granted');
     expect(find.text('¿Usamos tu ubicación?'), findsNothing);
+    expect(find.byKey(const ValueKey('permission_dialog_allow')), findsNothing);
   });
 
-  testWidgets('«No permitir» continúa con origen manual sin solicitar permiso', (
-    tester,
-  ) async {
+  testWidgets('permiso denegado conserva el origen manual', (tester) async {
     final storage = InMemoryLocalStorage();
     await _pumpApp(
       tester,
@@ -141,9 +136,8 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('permission_allow')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('permission_dialog_deny')));
-    await tester.pumpAndSettle();
-    expect(await storage.read('location_permission_result'), isNull);
-    expect(find.text('¿Usamos tu ubicación?'), findsNothing);
+    expect(await storage.read('location_permission_result'), 'denied');
+    expect(find.text('Puedes continuar con un origen manual.'), findsOneWidget);
+    expect(find.text('¿Usamos tu ubicación?'), findsOneWidget);
   });
 }

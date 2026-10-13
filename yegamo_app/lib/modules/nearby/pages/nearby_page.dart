@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../env/config/app_config.dart';
 import '../../../shared/design_system/yg_components.dart';
 import '../../../shared/location/location_service.dart';
 import '../../../shared/map/yg_map_controls.dart';
@@ -81,6 +82,9 @@ class _NearbyPageState extends State<NearbyPage> {
     final vm = context.watch<NearbyViewModel>();
     final snapshot = vm.snapshot;
     final state = vm.loading ? UxState.loading : snapshot.state;
+    final radiusLabel = context.read<AppConfig>().demoDataEnabled
+        ? '3 km'
+        : '1 km';
 
     if (state == UxState.noCoverage) {
       return Scaffold(
@@ -115,8 +119,8 @@ class _NearbyPageState extends State<NearbyPage> {
             YgMapTopRow(
               title: 'Cerca de ti',
               subtitle: stops.isEmpty
-                  ? 'Radio de 1 km'
-                  : '${stops.length} ${stops.length == 1 ? 'parada' : 'paradas'} · radio de 1 km',
+                  ? 'Radio de $radiusLabel'
+                  : '${stops.length} ${stops.length == 1 ? 'parada' : 'paradas'} · radio de $radiusLabel',
               onBack: () => Navigator.of(context).maybePop(),
               trailingIcon: YgIcons.buscar,
               trailingLabel: 'Buscar',
@@ -479,10 +483,7 @@ class _ManualOrigin extends StatelessWidget {
                     focusedBorder: InputBorder.none,
                     filled: false,
                     hintText: 'latitud, longitud',
-                    hintStyle: TextStyle(
-                      fontSize: 15,
-                      color: YgColors.text3,
-                    ),
+                    hintStyle: TextStyle(fontSize: 15, color: YgColors.text3),
                   ),
                 ),
               ),
