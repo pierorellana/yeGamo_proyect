@@ -55,21 +55,21 @@ fvm flutter run \
   --dart-define=YEGAMO_MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png
 ```
 
-La búsqueda de lugares es manual, no autocompletado. El backend consulta
-Nominatim respetando su límite de una solicitud por segundo y muestra la
-fuente/estado recibido.
+La búsqueda de lugares sugiere resultados después de 500 ms sin cambios y con
+al menos tres caracteres. El backend consulta Nominatim respetando su límite
+de una solicitud por segundo y la app muestra la fuente/estado recibido.
 
 ## API local mediante túnel HTTPS
 
-Para probar el iPhone conectado por datos móviles, levanta el API con el
-proveedor demo en desarrollo, reenvía el puerto `3000` desde la vista **Ports**
+Para probar el iPhone conectado por datos móviles, levanta el API con
+Nominatim y Overpass habilitados, reenvía el puerto `3000` desde la vista **Ports**
 de VS Code con visibilidad **Public** y copia la URL HTTPS. Después ejecuta:
 
 ```bash
 export YEGAMO_TUNNEL_URL='https://URL_PUBLICA_COPIADA_DE_VS_CODE'
 fvm flutter run -d 00008140-001461680A7B801C \
   --dart-define=YEGAMO_ENV=development \
-  --dart-define=YEGAMO_DEMO_DATA=true \
+  --dart-define=YEGAMO_DEMO_DATA=false \
   --dart-define=YEGAMO_REAL_MAP=true \
   --dart-define=YEGAMO_API_BASE_URL="$YEGAMO_TUNNEL_URL"
 ```

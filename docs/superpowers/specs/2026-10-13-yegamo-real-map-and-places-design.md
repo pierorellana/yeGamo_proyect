@@ -142,3 +142,28 @@ La política oficial de tiles OSM exige atribución visible, identificación de
 la aplicación y uso moderado; Nominatim exige como máximo una solicitud por
 segundo y prohíbe autocompletado. Estas restricciones forman parte del diseño,
 no son detalles opcionales de despliegue.
+
+## Addendum — interacción real y selección de puntos
+
+La superficie MapLibre debe aceptar arrastre, zoom por gesto/pellizco, doble
+toque, rotación e inclinación. Los botones de zoom y recentrado de yeGamo deben
+operar sobre la cámara nativa de MapLibre cuando el mapa real está activo; el
+controlador del mapa ilustrado se conserva únicamente como fallback de pruebas.
+
+Las paradas cercanas se descubren mediante la consulta OSM/Overpass configurada
+en el gateway. El gateway puede recorrer endpoints públicos configurados y,
+cuando esos servicios están saturados, usar como fallback de bajo volumen el
+endpoint acotado de mapa de OpenStreetMap. Puede reintentar únicamente fallos
+transitorios, manteniendo caché, límites de volumen y el estado `DEGRADED` para
+datos OSM sin horarios ni posiciones de vehículos en vivo.
+
+El planificador muestra nombres de direcciones/lugares al usuario. La búsqueda
+se ejecuta por acción explícita (buscar o enviar desde el teclado), muestra
+resultados canónicos de `/v1/places/search` y solo convierte la selección a
+coordenadas al construir la solicitud de planificación. Editar un campo invalida
+su selección anterior; intercambiar origen y destino intercambia también sus
+coordenadas.
+
+Las hojas y modales calculan su altura visible con `MediaQuery.viewInsets` y
+se posicionan por encima del teclado. Su contenido sigue siendo desplazable y
+no se amplía automáticamente a una altura que oculte el campo enfocado.
