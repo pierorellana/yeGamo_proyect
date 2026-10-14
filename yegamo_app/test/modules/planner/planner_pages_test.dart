@@ -77,15 +77,34 @@ Future<void> _openPlanner(
   await tester.pumpWidget(
     YeGamoApp(
       localStorage: storage,
-      apiClient: testClient(handler),
+      apiClient: testClient((request) async {
+        if (request.uri.path.endsWith('/v1/places/search')) {
+          final query = request.uri.queryParameters['q'] ?? '';
+          final slug = query.toLowerCase().contains('origen')
+              ? 'origen'
+              : 'destino';
+          final point = slug == 'origen'
+              ? const {'lat': -2.10, 'lon': -79.90}
+              : const {'lat': -2.20, 'lon': -79.80};
+          return jsonResponse(<Object?>[
+            <String, Object?>{
+              'id': 'place-$slug',
+              'label': 'Lugar $slug',
+              'location': point,
+              'source': 'test',
+              'dataState': 'CURRENT',
+            },
+          ]);
+        }
+        return handler(request);
+      }),
       connectivityService: FakeConnectivityService(),
       locationService: FakeLocationService(),
     ),
   );
   await tester.pump(const Duration(milliseconds: 300));
-  Navigator.of(
-    tester.element(find.byType(Scaffold).first),
-  ).pushNamed(AppRoutes.planner);
+  Navigator.of(tester.element(find.byType(Navigator).first))
+      .pushNamed(AppRoutes.planner);
   await _pumpFor(tester, 1000);
 }
 
@@ -97,15 +116,29 @@ void _pressCalculate(WidgetTester tester) {
       .onPressed!();
 }
 
+Future<void> _selectAddress(
+  WidgetTester tester,
+  String key,
+  String query,
+  String resultId,
+) async {
+  await tester.enterText(find.byKey(ValueKey(key)), query);
+  await tester.testTextInput.receiveAction(TextInputAction.search);
+  await _pumpFor(tester, 800);
+  await tester.tap(find.byKey(ValueKey('planner_place_$resultId')));
+  await _pumpFor(tester, 200);
+}
+
 Future<void> _calculate(WidgetTester tester) async {
-  await tester.enterText(
-    find.byKey(const ValueKey('planner_origin')),
-    '-2.10, -79.90',
-  );
+  await _selectAddress(tester, 'planner_origin', 'origen', 'place-origen');
   await tester.enterText(
     find.byKey(const ValueKey('planner_destination')),
-    '-2.20, -79.80',
+    'destino',
   );
+  await tester.testTextInput.receiveAction(TextInputAction.search);
+  await _pumpFor(tester, 800);
+  await tester.tap(find.byKey(const ValueKey('planner_place_place-destino')));
+  await _pumpFor(tester, 200);
   _pressCalculate(tester);
   await _pumpFor(tester, 1500);
 }
@@ -122,23 +155,26 @@ Future<void> _loadGeist() async {
 void main() {
   setUpAll(_loadGeist);
 
-  testWidgets('planner form validates coordinates and offers 3 preferences', (
-    tester,
-  ) async {
-    await _openPlanner(tester, (_) async => jsonResponse(validPlanBody()));
-    expect(find.text('Planificar viaje'), findsOneWidget);
-    expect(find.text('Más confiable'), findsOneWidget);
-    expect(find.text('Menos caminata'), findsOneWidget);
-    expect(find.text('Menos transbordos'), findsOneWidget);
-    expect(find.byKey(const ValueKey('planner_origin')), findsOneWidget);
-    expect(find.byKey(const ValueKey('planner_destination')), findsOneWidget);
+  testWidgets(
+    'planner form validates selected places and offers 3 preferences',
+    (tester) async {
+      await _openPlanner(tester, (_) async => jsonResponse(validPlanBody()));
+      expect(find.text('Planificar viaje'), findsOneWidget);
+      expect(find.text('Más confiable'), findsOneWidget);
+      expect(find.text('Menos caminata'), findsOneWidget);
+      expect(find.text('Menos transbordos'), findsOneWidget);
+      expect(find.byKey(const ValueKey('planner_origin')), findsOneWidget);
+      expect(find.byKey(const ValueKey('planner_destination')), findsOneWidget);
 
-    await tester.ensureVisible(find.byKey(const ValueKey('planner_calculate')));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.byKey(const ValueKey('planner_calculate')));
-    await _pumpFor(tester, 600);
-    expect(find.text('Revisa los datos'), findsOneWidget);
-  });
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('planner_calculate')),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.byKey(const ValueKey('planner_calculate')));
+      await _pumpFor(tester, 600);
+      expect(find.text('Revisa los datos'), findsOneWidget);
+    },
+  );
 
   testWidgets('alternatives never says live without authorized source', (
     tester,
@@ -185,9 +221,8 @@ void main() {
   ) async {
     await _openPlanner(tester, (_) async => jsonResponse(_planWithTimes()));
     await _calculate(tester);
-    Navigator.of(
-      tester.element(find.byType(Scaffold).first),
-    ).pushNamed(AppRoutes.departure);
+    Navigator.of(tester.element(find.byType(Navigator).first))
+        .pushNamed(AppRoutes.departure);
     await _pumpFor(tester, 1600);
 
     expect(find.byType(FlipDigits), findsOneWidget);
@@ -203,9 +238,8 @@ void main() {
   ) async {
     await _openPlanner(tester, (_) async => jsonResponse(validPlanBody()));
     await _calculate(tester);
-    Navigator.of(
-      tester.element(find.byType(Scaffold).first),
-    ).pushNamed(AppRoutes.departure);
+    Navigator.of(tester.element(find.byType(Navigator).first))
+        .pushNamed(AppRoutes.departure);
     await _pumpFor(tester, 1000);
 
     expect(find.text('Sin recomendación disponible'), findsOneWidget);
@@ -217,7 +251,7 @@ void main() {
   ) async {
     await _openPlanner(tester, (_) async => jsonResponse(_planWithTimes()));
     await _calculate(tester);
-    Navigator.of(tester.element(find.byType(Scaffold).first)).push(
+    Navigator.of(tester.element(find.byType(Navigator).first)).push(
       PageRouteBuilder<void>(
         pageBuilder: (_, _, _) => const PlannerStepsPage(),
         transitionDuration: Duration.zero,
@@ -239,13 +273,12 @@ void main() {
       await Future<void>.delayed(const Duration(seconds: 30));
       return jsonResponse(validPlanBody());
     });
-    await tester.enterText(
-      find.byKey(const ValueKey('planner_origin')),
-      '-2.10, -79.90',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('planner_destination')),
-      '-2.20, -79.80',
+    await _selectAddress(tester, 'planner_origin', 'origen', 'place-origen');
+    await _selectAddress(
+      tester,
+      'planner_destination',
+      'destino',
+      'place-destino',
     );
     _pressCalculate(tester);
     await _pumpFor(tester, 800);

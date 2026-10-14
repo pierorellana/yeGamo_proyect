@@ -44,9 +44,8 @@ Future<void> _openNearby(
     ),
   );
   await tester.pump(const Duration(milliseconds: 300));
-  Navigator.of(
-    tester.element(find.byType(Scaffold).first),
-  ).pushNamed(AppRoutes.nearby);
+  Navigator.of(tester.element(find.byType(Navigator).first))
+      .pushNamed(AppRoutes.nearby);
   for (var i = 0; i < 8; i++) {
     await tester.pump(const Duration(milliseconds: 200));
   }
@@ -76,11 +75,7 @@ void main() {
   testWidgets('nearby asks for permission without inventing stops', (
     tester,
   ) async {
-    await _openNearby(
-      tester,
-      access: LocationAccess.denied,
-      position: null,
-    );
+    await _openNearby(tester, access: LocationAccess.denied, position: null);
 
     expect(find.text('Necesitamos tu ubicación'), findsOneWidget);
     expect(find.text('Parada Uno'), findsNothing);

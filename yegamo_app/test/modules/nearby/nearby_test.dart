@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yegamo_app/env/config/app_config.dart';
 import 'package:yegamo_app/modules/nearby/services/nearby_repository.dart';
+import 'package:yegamo_app/modules/nearby/models/nearby_models.dart';
 import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/models/data_state.dart';
 import 'package:yegamo_app/shared/services/api_client.dart';
@@ -9,6 +10,20 @@ import 'package:yegamo_app/shared/services/connectivity_service.dart';
 import '../test_support.dart';
 
 void main() {
+  test('parses source metadata from an OSM nearby stop', () {
+    final stop = NearbyStop.fromJson({
+      'id': 'stop-1',
+      'name': 'Parada OSM',
+      'distanceM': 120,
+      'source': 'openstreetmap',
+      'dataState': 'DEGRADED',
+      'location': {'lat': -2.17, 'lon': -79.9},
+    });
+
+    expect(stop.source, 'openstreetmap');
+    expect(stop.dataState, DataState.degraded);
+  });
+
   test('requests manual origin when location permission is denied', () async {
     final snapshot = await NearbyRepository(
       apiClient: testClient(

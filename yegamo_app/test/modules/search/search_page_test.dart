@@ -22,7 +22,7 @@ Future<void> _openSearch(WidgetTester tester, ApiClient client) async {
     ),
   );
   await tester.pump(const Duration(milliseconds: 300));
-  Navigator.of(tester.element(find.byType(Scaffold).first))
+  Navigator.of(tester.element(find.byType(Navigator).first))
       .pushNamed(AppRoutes.search);
   for (var i = 0; i < 8; i++) {
     await tester.pump(const Duration(milliseconds: 200));
@@ -38,6 +38,34 @@ Future<void> _search(WidgetTester tester, String text) async {
 }
 
 void main() {
+  testWidgets('search waits for three characters and debounces input', (
+    tester,
+  ) async {
+    var calls = 0;
+    await _openSearch(
+      tester,
+      testClient((_) async {
+        calls += 1;
+        return jsonResponse(<Object?>[]);
+      }),
+    );
+    final callsBeforeTyping = calls;
+
+    await tester.enterText(find.byKey(const ValueKey('search_query')), 'te');
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(calls, callsBeforeTyping);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('search_query')),
+      'terminal',
+    );
+    await tester.pump(const Duration(milliseconds: 499));
+    expect(calls, callsBeforeTyping);
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump();
+    expect(calls, callsBeforeTyping + 1);
+  });
+
   testWidgets('search lists recents and keeps its keys', (tester) async {
     await _openSearch(
       tester,

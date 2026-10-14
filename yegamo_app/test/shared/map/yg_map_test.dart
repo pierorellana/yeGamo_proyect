@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yegamo_app/shared/design_system/yg_motion.dart';
+import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/map/yg_map.dart';
 import 'package:yegamo_app/shared/map/yg_map_view.dart';
 
@@ -32,9 +33,22 @@ void _size(WidgetTester tester) {
 }
 
 void main() {
+  test('focusOn publishes a new camera target', () {
+    final scope = YgMapScope();
+    const point = GeoCoordinate(latitude: -2.17, longitude: -79.9);
+
+    scope.focusOn(point);
+
+    expect(scope.focusTarget?.latitude, point.latitude);
+    expect(scope.focusTarget?.longitude, point.longitude);
+    expect(scope.focusRequestVersion, 1);
+  });
+
   for (final demo in [false, true]) {
     for (final reduced in [false, true]) {
-      testWidgets('monta cada modo (demo=$demo, reducido=$reduced)', (tester) async {
+      testWidgets('monta cada modo (demo=$demo, reducido=$reduced)', (
+        tester,
+      ) async {
         _size(tester);
         final ctl = YgMapController();
         for (final mode in YgMapMode.values) {
@@ -73,7 +87,11 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 2));
       await tester.pumpWidget(
-        _host(YgMapView(mode: YgMapMode.active, ds: ds, sp: 1), ctl, demo: true),
+        _host(
+          YgMapView(mode: YgMapMode.active, ds: ds, sp: 1),
+          ctl,
+          demo: true,
+        ),
       );
       await tester.pump(const Duration(seconds: 2));
       expect(tester.takeException(), isNull);
@@ -81,7 +99,9 @@ void main() {
     });
   }
 
-  testWidgets('con movimiento reducido no queda ningún bucle activo', (tester) async {
+  testWidgets('con movimiento reducido no queda ningún bucle activo', (
+    tester,
+  ) async {
     _size(tester);
     final ctl = YgMapController();
     await tester.pumpWidget(
@@ -94,13 +114,20 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.pumpWidget(
-      _host(const YgMapView(mode: YgMapMode.loading), ctl, demo: true, reduced: true),
+      _host(
+        const YgMapView(mode: YgMapMode.loading),
+        ctl,
+        demo: true,
+        reduced: true,
+      ),
     );
     await tester.pumpAndSettle();
     expect(tester.hasRunningAnimations, isFalse);
   });
 
-  testWidgets('sin demo el mapa termina de planear (sin bucles)', (tester) async {
+  testWidgets('sin demo el mapa termina de planear (sin bucles)', (
+    tester,
+  ) async {
     _size(tester);
     final ctl = YgMapController();
     await tester.pumpWidget(
@@ -141,7 +168,11 @@ void main() {
     final picked = <int>[];
     await tester.pumpWidget(
       _host(
-        YgMapView(mode: YgMapMode.nearby, visibleBottom: 760, onPickStop: picked.add),
+        YgMapView(
+          mode: YgMapMode.nearby,
+          visibleBottom: 760,
+          onPickStop: picked.add,
+        ),
         ctl,
         demo: true,
         reduced: true,
@@ -161,11 +192,18 @@ void main() {
     expect(ctl.pan, Offset.zero);
   });
 
-  testWidgets('el zoom del controlador no lanza y se limita a 0.5–3', (tester) async {
+  testWidgets('el zoom del controlador no lanza y se limita a 0.5–3', (
+    tester,
+  ) async {
     _size(tester);
     final ctl = YgMapController();
     await tester.pumpWidget(
-      _host(const YgMapView(mode: YgMapMode.home), ctl, demo: true, reduced: true),
+      _host(
+        const YgMapView(mode: YgMapMode.home),
+        ctl,
+        demo: true,
+        reduced: true,
+      ),
     );
     for (var i = 0; i < 10; i++) {
       ctl.zoomBy(1.4);
@@ -177,5 +215,24 @@ void main() {
     }
     await tester.pump();
     expect(ctl.zoom, .5);
+  });
+
+  test('el controlador reenvía zoom y recentrado al mapa nativo', () async {
+    final ctl = YgMapController();
+    var nativeZoom = 0.0;
+    var resetCount = 0;
+
+    ctl.attachNativeCamera(
+      zoomBy: (factor) async => nativeZoom = factor,
+      reset: () async => resetCount++,
+    );
+
+    ctl.zoomBy(1.4);
+    ctl.reset();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(nativeZoom, 1.4);
+    expect(resetCount, 1);
+    ctl.detachNativeCamera();
   });
 }
