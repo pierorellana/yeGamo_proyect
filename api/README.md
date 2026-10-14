@@ -44,6 +44,10 @@ APP_VERSION=1.1.1
 DATABASE_URL=postgresql://127.0.0.1:5432/yegamo
 NOMINATIM_ENABLED=true
 NOMINATIM_USER_AGENT=yeGamo-local-dev/1.0
+OVERPASS_ENABLED=true
+OVERPASS_BASE_URL=https://overpass-api.de/api/interpreter
+OVERPASS_TIMEOUT_MS=20000
+OVERPASS_CACHE_TTL_MS=900000
 ```
 
 Desde `api/`, carga esas variables y aplica el esquema:
@@ -66,11 +70,19 @@ PGOPTIONS='-c yegamo.seed_mode=development' \
 
 El API puede arrancar con el proveedor demo explícito:
 
+La primera consulta de paradas lee PostgreSQL/PostGIS. Si no hay cobertura
+local, el API consulta Overpass y, si sus instancias públicas están saturadas,
+usa el fallback acotado de la API de mapa de OpenStreetMap. Luego guarda las
+paradas OSM con referencias idempotentes y vuelve a leerlas. Las paradas se
+muestran como `DEGRADED` porque OSM aporta ubicación, no horarios ni posiciones
+de buses en vivo.
+
 ```bash
 NODE_ENV=development \
-DEMO_PROVIDER_ENABLED=true \
 NOMINATIM_ENABLED=true \
 NOMINATIM_USER_AGENT='yeGamo-local-dev/1.0' \
+OVERPASS_ENABLED=true \
+OVERPASS_BASE_URL='https://overpass-api.de/api/interpreter' \
 npm run start:dev
 ```
 
@@ -85,7 +97,7 @@ export YEGAMO_TUNNEL_URL='https://URL_PUBLICA_COPIADA_DE_VS_CODE'
 cd ../yegamo_app
 fvm flutter run -d 00008140-001461680A7B801C \
   --dart-define=YEGAMO_ENV=development \
-  --dart-define=YEGAMO_DEMO_DATA=true \
+  --dart-define=YEGAMO_DEMO_DATA=false \
   --dart-define=YEGAMO_REAL_MAP=true \
   --dart-define=YEGAMO_API_BASE_URL="$YEGAMO_TUNNEL_URL"
 ```
@@ -97,9 +109,13 @@ usa el túnel. El cliente Flutter nativo no requiere CORS.
 
 Nominatim es el proveedor público de geocodificación habilitado en desarrollo
 por defecto. En producción debe habilitarse explícitamente con un
-`NOMINATIM_USER_AGENT` propio. Las búsquedas son manuales, están limitadas a
-una solicitud por segundo y no implementan autocompletado. En producción las
-capacidades dependientes responden `503
+`NOMINATIM_USER_AGENT` propio. Flutter inicia la búsqueda después de 500 ms
+sin cambios y con al menos tres caracteres; el gateway conserva la caché y
+respeta como mínimo una solicitud por segundo. Overpass se limita a una caja
+geográfica, tiene caché de quince minutos y no se consulta desde Flutter. El
+fallback de la API de mapa se limita a 1 km para respetar el límite de volumen
+de ese endpoint público.
+En producción las capacidades dependientes responden `503
 PROVIDER_UNAVAILABLE`, `dataState: UNAVAILABLE` y `X-Trace-Id`. El adapter
 `DemoTransitProvider` sólo se puede activar de forma explícita fuera de
 producción:
@@ -113,7 +129,8 @@ npm run start:dev
 ```
 
 No usar esa bandera como configuración productiva ni presentar sus respuestas
-como `LIVE`.
+como `LIVE`; para el flujo real del MVP se debe usar
+`OVERPASS_ENABLED=true`.
 
 ## Organización
 

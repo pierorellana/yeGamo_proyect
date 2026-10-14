@@ -883,6 +883,7 @@ components:
         name: { type: string, example: Parada Centro }
         location: { $ref: '#/components/schemas/GeoPoint' }
         distanceM: { type: number, minimum: 0, example: 420 }
+        source: { type: string, nullable: true, example: openstreetmap }
         dataState: { $ref: '#/components/schemas/DataState' }
     ETAEstimate:
       type: object

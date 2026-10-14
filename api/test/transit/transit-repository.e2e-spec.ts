@@ -28,6 +28,7 @@ describeDatabase('Prisma transit catalog repository', () => {
       id: '00000000-0000-4000-8000-000000000003',
       name: 'Demo origin stop',
       dataState: 'DEGRADED',
+      source: null,
       location: { lat: -2.17, lon: -79.9 },
     });
     expect(stops[0]?.distanceM).toBeGreaterThan(0);

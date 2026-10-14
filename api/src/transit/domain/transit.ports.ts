@@ -2,6 +2,7 @@ import { ProviderGatewayError } from '../../provider-gateway/domain/provider.err
 import type { DataState, GeoPoint } from '../../provider-gateway/domain/provider.types';
 
 export const TRANSIT_READ_PORT = Symbol('TRANSIT_READ_PORT');
+export const TRANSIT_CATALOG_WRITE_PORT = Symbol('TRANSIT_CATALOG_WRITE_PORT');
 
 export interface TransitAgency {
   id: string;
@@ -25,6 +26,14 @@ export interface TransitStop {
   location: GeoPoint;
   distanceM?: number;
   dataState: DataState;
+  source: string | null;
+}
+
+export interface DiscoveredTransitStop {
+  externalId: string;
+  provider: string;
+  name: string;
+  location: GeoPoint;
 }
 
 export interface TimeWindow {
@@ -56,6 +65,10 @@ export interface TransitReadPort {
   nearbyStops(input: NearbyStopsInput): Promise<TransitStop[]>;
   departures(stopId: string): Promise<Departure[]>;
   route(routeId: string): Promise<TransitRoute | null>;
+}
+
+export interface TransitCatalogWritePort {
+  upsertDiscoveredStops(stops: DiscoveredTransitStop[]): Promise<void>;
 }
 
 export class UnavailableTransitReadPort implements TransitReadPort {

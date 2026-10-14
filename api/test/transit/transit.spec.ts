@@ -6,9 +6,12 @@ import { configureApp } from '../../src/app.bootstrap';
 import { AppModule } from '../../src/app.module';
 import {
   TRANSIT_READ_PORT,
+  TransitCatalogWritePort,
   TransitReadPort,
+  TransitStop,
   UnavailableTransitReadPort,
 } from '../../src/transit/domain/transit.ports';
+import { TransitService } from '../../src/transit/application/transit.service';
 
 async function createApp(port?: TransitReadPort): Promise<INestApplication> {
   let builder = NestTest.createTestingModule({ imports: [AppModule] });
@@ -98,6 +101,7 @@ describe('transit canonical success and 404 mapping', () => {
           name: 'Parada Centro',
           location: { lat: -2.17, lon: -79.9 },
           distanceM: 420,
+          source: null,
           dataState: 'CURRENT',
         },
       ],
@@ -123,6 +127,7 @@ describe('transit canonical success and 404 mapping', () => {
             name: 'Parada Centro',
             location: { lat: -2.17, lon: -79.9 },
             distanceM: 420,
+            source: null,
             dataState: 'CURRENT',
           },
         ]);
@@ -140,5 +145,85 @@ describe('transit canonical success and 404 mapping', () => {
           traceId: expect.any(String),
         });
       });
+  });
+});
+
+describe('transit local-first discovery', () => {
+  it('does not call discovery when local stops exist', async () => {
+    const read: TransitReadPort = {
+      nearbyStops: jest.fn(
+        async (): Promise<TransitStop[]> => [
+          {
+            id: '550e8400-e29b-41d4-a716-446655440001',
+            name: 'Parada local',
+            location: { lat: -2.17, lon: -79.9 },
+            distanceM: 100,
+            dataState: 'DEGRADED',
+            source: 'openstreetmap',
+          },
+        ],
+      ),
+      departures: async () => [],
+      route: async () => null,
+    };
+    const discovery = { discover: jest.fn() };
+    const write: TransitCatalogWritePort = {
+      upsertDiscoveredStops: jest.fn(async () => undefined),
+    };
+    const service = new TransitService(read, discovery, write);
+
+    await service.nearbyStops({ lat: -2.17, lon: -79.9, radiusM: 800 });
+
+    expect(discovery.discover).not.toHaveBeenCalled();
+  });
+
+  it('discovers, persists and reads again when local stops are empty', async () => {
+    const read: TransitReadPort = {
+      nearbyStops: jest
+        .fn<Promise<TransitStop[]>, []>()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: '550e8400-e29b-41d4-a716-446655440002',
+            name: 'Parada OSM',
+            location: { lat: -2.17, lon: -79.9 },
+            distanceM: 120,
+            dataState: 'DEGRADED',
+            source: 'openstreetmap',
+          },
+        ]),
+      departures: async () => [],
+      route: async () => null,
+    };
+    const discovery = {
+      discover: jest.fn(async () => ({
+        providerKey: 'openstreetmap-overpass',
+        sourceAuthorized: true,
+        observedAt: '2026-10-14T12:00:00.000Z',
+        stops: [
+          {
+            externalId: 'node:10',
+            name: 'Parada OSM',
+            location: { lat: -2.17, lon: -79.9 },
+          },
+        ],
+      })),
+    };
+    const write: TransitCatalogWritePort = {
+      upsertDiscoveredStops: jest.fn(async () => undefined),
+    };
+    const service = new TransitService(read, discovery, write);
+
+    await expect(
+      service.nearbyStops({ lat: -2.17, lon: -79.9, radiusM: 800 }),
+    ).resolves.toHaveLength(1);
+    expect(write.upsertDiscoveredStops).toHaveBeenCalledWith([
+      {
+        externalId: 'node:10',
+        provider: 'openstreetmap',
+        name: 'Parada OSM',
+        location: { lat: -2.17, lon: -79.9 },
+      },
+    ]);
   });
 });

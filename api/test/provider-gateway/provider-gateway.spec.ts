@@ -8,6 +8,8 @@ import { JourneyPlanRequest } from '../../src/provider-gateway/domain/provider.t
 import { createTransitProviders } from '../../src/provider-gateway/provider-gateway.module';
 import { DEFAULT_GEOCODING_TIMEOUT_MS } from '../../src/provider-gateway/application/geocoding-gateway.service';
 import { CanonicalHttpExceptionFilter } from '../../src/shared/errors/canonical-http-exception.filter';
+import { TransitStopDiscoveryGatewayService } from '../../src/provider-gateway/application/transit-stop-discovery-gateway.service';
+import { TransitStopDiscoveryProvider } from '../../src/provider-gateway/domain/provider.ports';
 
 const request: JourneyPlanRequest = {
   origin: { lat: -2.17, lon: -79.9 },
@@ -65,6 +67,45 @@ describe('provider gateway', () => {
     const gateway = new TransitGatewayService([failing, new DemoTransitProvider('test')]);
 
     await expect(gateway.plan(request)).resolves.toMatchObject({ dataState: 'DEGRADED' });
+  });
+
+  it('falls back to the next stop provider when the first has no stops', async () => {
+    const empty: TransitStopDiscoveryProvider = {
+      providerKey: 'empty-stops',
+      isDemo: false,
+      discoverStops: async () => ({
+        providerKey: 'empty-stops',
+        isDemo: false,
+        sourceAuthorized: true,
+        observedAt: new Date().toISOString(),
+        data: [],
+      }),
+    };
+    const fallback: TransitStopDiscoveryProvider = {
+      providerKey: 'fallback-stops',
+      isDemo: false,
+      discoverStops: async () => ({
+        providerKey: 'fallback-stops',
+        isDemo: false,
+        sourceAuthorized: true,
+        observedAt: new Date().toISOString(),
+        data: [
+          {
+            externalId: 'node:1',
+            name: 'Parada real',
+            location: { lat: -2.17, lon: -79.9 },
+          },
+        ],
+      }),
+    };
+
+    await expect(
+      new TransitStopDiscoveryGatewayService([empty, fallback]).discover({
+        lat: -2.17,
+        lon: -79.9,
+        radiusM: 800,
+      }),
+    ).resolves.toMatchObject({ providerKey: 'fallback-stops', stops: [{ name: 'Parada real' }] });
   });
 
   it('returns timeout when the provider exceeds the deadline', async () => {

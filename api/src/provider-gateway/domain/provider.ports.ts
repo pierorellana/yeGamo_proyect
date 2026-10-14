@@ -29,6 +29,26 @@ export interface GeocodingProvider {
   reverse(point: GeoPoint): Promise<ProviderResult<unknown>>;
 }
 
+export interface TransitStopCandidate {
+  externalId: string;
+  name: string;
+  location: GeoPoint;
+}
+
+export interface TransitStopDiscoveryInput {
+  lat: number;
+  lon: number;
+  radiusM: number;
+}
+
+export interface TransitStopDiscoveryProvider {
+  readonly providerKey: string;
+  readonly isDemo: boolean;
+  discoverStops(
+    input: TransitStopDiscoveryInput,
+  ): Promise<ProviderResult<TransitStopCandidate[]>>;
+}
+
 export interface VehiclePositionProvider {
   positions(routeIds: string[]): Promise<unknown>;
 }

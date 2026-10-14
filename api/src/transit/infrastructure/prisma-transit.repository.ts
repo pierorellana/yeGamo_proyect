@@ -3,9 +3,11 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../shared/database/prisma.service';
 import type {
+  DiscoveredTransitStop,
   Departure,
   NearbyStopsInput,
   TransitAgency,
+  TransitCatalogWritePort,
   TransitReadPort,
   TransitRoute,
   TransitStop,
@@ -17,6 +19,7 @@ interface NearbyStopRow {
   lat: number;
   lon: number;
   distance_m: number;
+  source: string | null;
 }
 
 interface TransitRouteRow {
@@ -33,7 +36,9 @@ interface TransitRouteRow {
  * operators that Prisma cannot express through its typed CRUD API.
  */
 @Injectable()
-export class PrismaTransitReadRepository implements TransitReadPort {
+export class PrismaTransitReadRepository
+  implements TransitReadPort, TransitCatalogWritePort
+{
   constructor(private readonly prisma: PrismaService) {}
 
   async nearbyStops(input: NearbyStopsInput): Promise<TransitStop[]> {
@@ -46,8 +51,17 @@ export class PrismaTransitReadRepository implements TransitReadPort {
         ST_Distance(
           s.location,
           ST_SetSRID(ST_MakePoint(${input.lon}, ${input.lat}), 4326)::geography
-        )::float8 AS distance_m
+        )::float8 AS distance_m,
+        source_ref.provider AS source
       FROM transit_stops AS s
+      LEFT JOIN LATERAL (
+        SELECT pr.provider
+        FROM provider_references AS pr
+        WHERE pr.entity_type = 'STOP'
+          AND pr.entity_id = s.id
+        ORDER BY pr.updated_at DESC
+        LIMIT 1
+      ) AS source_ref ON TRUE
       WHERE s.canonical_status = 'ACTIVE'
         AND ST_DWithin(
           s.location,
@@ -63,7 +77,97 @@ export class PrismaTransitReadRepository implements TransitReadPort {
       location: { lat: Number(row.lat), lon: Number(row.lon) },
       distanceM: Number(row.distance_m),
       dataState: 'DEGRADED',
+      source: row.source,
     }));
+  }
+
+  async upsertDiscoveredStops(stops: DiscoveredTransitStop[]): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      for (const stop of stops) {
+        const lockKey = stop.provider + ':' + stop.externalId;
+        await tx.$executeRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+        );
+
+        const references = await tx.$queryRaw<{ entity_id: string }[]>(
+          Prisma.sql`
+            SELECT entity_id::text AS entity_id
+            FROM provider_references
+            WHERE provider = ${stop.provider}
+              AND entity_type = 'STOP'
+              AND external_id = ${stop.externalId}
+            LIMIT 1
+          `,
+        );
+
+        const existing = references[0];
+        if (existing !== undefined) {
+          await tx.$executeRaw(
+            Prisma.sql`
+              UPDATE transit_stops
+              SET
+                name = ${stop.name},
+                location = ST_SetSRID(
+                  ST_MakePoint(${stop.location.lon}, ${stop.location.lat}),
+                  4326
+                )::geography,
+                updated_at = NOW()
+              WHERE id = ${existing.entity_id}::uuid
+            `,
+          );
+          await tx.$executeRaw(
+            Prisma.sql`
+              UPDATE provider_references
+              SET last_seen_at = NOW()
+              WHERE provider = ${stop.provider}
+                AND entity_type = 'STOP'
+                AND external_id = ${stop.externalId}
+            `,
+          );
+          continue;
+        }
+
+        const inserted = await tx.$queryRaw<{ id: string }[]>(
+          Prisma.sql`
+            INSERT INTO transit_stops (name, location, canonical_status)
+            VALUES (
+              ${stop.name},
+              ST_SetSRID(
+                ST_MakePoint(${stop.location.lon}, ${stop.location.lat}),
+                4326
+              )::geography,
+              'ACTIVE'
+            )
+            RETURNING id::text AS id
+          `,
+        );
+        const insertedStop = inserted[0];
+        if (insertedStop === undefined) {
+          throw new Error('The discovered transit stop could not be stored');
+        }
+
+        await tx.$executeRaw(
+          Prisma.sql`
+            INSERT INTO provider_references (
+              provider,
+              entity_type,
+              entity_id,
+              external_id,
+              storage_policy,
+              last_seen_at
+            )
+            VALUES (
+              ${stop.provider},
+              'STOP',
+              ${insertedStop.id}::uuid,
+              ${stop.externalId},
+              'PERSIST_ALLOWED',
+              NOW()
+            )
+          `,
+        );
+      }
+    });
   }
 
   // The canonical schema has no timetable/departure table yet, so returning
