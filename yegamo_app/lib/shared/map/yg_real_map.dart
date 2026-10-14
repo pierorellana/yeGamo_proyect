@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
@@ -34,13 +36,19 @@ class YgRealMap extends StatefulWidget {
     required this.view,
     required this.config,
     required this.locationService,
+    required this.mapController,
     this.points = const <YgMapPoint>[],
+    this.focusTarget,
+    this.focusRequestVersion = 0,
   });
 
   final YgMapView view;
   final AppConfig config;
   final LocationService locationService;
+  final YgMapController mapController;
   final List<YgMapPoint> points;
+  final GeoCoordinate? focusTarget;
+  final int focusRequestVersion;
 
   @override
   State<YgRealMap> createState() => _YgRealMapState();
@@ -60,6 +68,7 @@ class _YgRealMapState extends State<YgRealMap> {
   bool _dynamicLayersAdded = false;
   bool _mapUnavailable = false;
   bool _usingFallbackStyle = false;
+  int _lastFocusRequestVersion = 0;
 
   bool get _hasRemoteStyle => widget.config.mapStyleUrl.trim().isNotEmpty;
 
@@ -72,6 +81,7 @@ class _YgRealMapState extends State<YgRealMap> {
   @override
   void initState() {
     super.initState();
+    _attachNativeCamera();
     _loadLocation();
     _scheduleStyleFallback();
   }
@@ -79,8 +89,52 @@ class _YgRealMapState extends State<YgRealMap> {
   @override
   void didUpdateWidget(covariant YgRealMap oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.mapController != widget.mapController) {
+      oldWidget.mapController.detachNativeCamera();
+      _attachNativeCamera();
+    }
     if (!oldWidget.view.locOn && widget.view.locOn) _loadLocation();
     if (oldWidget.points != widget.points) _updateSources();
+    if (oldWidget.focusRequestVersion != widget.focusRequestVersion) {
+      _focusMap();
+    }
+  }
+
+  void _attachNativeCamera() {
+    widget.mapController.attachNativeCamera(
+      zoomBy: _zoomBy,
+      panBy: _panBy,
+      reset: _resetCamera,
+    );
+  }
+
+  Future<void> _zoomBy(double factor) async {
+    final controller = _controller;
+    if (controller == null) return;
+    await controller.animateCamera(CameraUpdate.zoomBy(log(factor) / log(2)));
+  }
+
+  Future<void> _panBy(Offset delta) async {
+    final controller = _controller;
+    if (controller == null) return;
+    // CameraUpdate.scrollBy moves the camera target. To make the map follow
+    // the user's finger, the camera moves in the opposite screen direction.
+    await controller.moveCamera(CameraUpdate.scrollBy(-delta.dx, -delta.dy));
+  }
+
+  Future<void> _resetCamera() async {
+    final controller = _controller;
+    if (controller == null) return;
+    final position = widget.view.locOn
+        ? await widget.locationService.currentPosition()
+        : null;
+    final target = position ?? _center;
+    await controller.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(target.latitude, target.longitude),
+        position == null ? 12.5 : 13,
+      ),
+    );
   }
 
   void _scheduleStyleFallback() {
@@ -117,6 +171,21 @@ class _YgRealMapState extends State<YgRealMap> {
 
   void _onMapCreated(MapLibreMapController controller) {
     _controller = controller;
+    _focusMap();
+  }
+
+  Future<void> _focusMap() async {
+    final target = widget.focusTarget;
+    final controller = _controller;
+    if (target == null ||
+        controller == null ||
+        widget.focusRequestVersion <= _lastFocusRequestVersion) {
+      return;
+    }
+    _lastFocusRequestVersion = widget.focusRequestVersion;
+    await controller.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(target.latitude, target.longitude), 15),
+    );
   }
 
   Future<void> _onStyleLoaded() async {
@@ -207,6 +276,7 @@ class _YgRealMapState extends State<YgRealMap> {
   @override
   void dispose() {
     _styleFallbackTimer?.cancel();
+    widget.mapController.detachNativeCamera();
     super.dispose();
   }
 
@@ -226,6 +296,15 @@ class _YgRealMapState extends State<YgRealMap> {
             ),
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
+            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+              Factory<EagerGestureRecognizer>(EagerGestureRecognizer.new),
+            },
+            rotateGesturesEnabled: true,
+            scrollGesturesEnabled: true,
+            zoomGesturesEnabled: true,
+            tiltGesturesEnabled: true,
+            doubleClickZoomEnabled: true,
+            dragEnabled: true,
             myLocationEnabled: _locationGranted && widget.view.locOn,
             logoEnabled: false,
             compassEnabled: false,

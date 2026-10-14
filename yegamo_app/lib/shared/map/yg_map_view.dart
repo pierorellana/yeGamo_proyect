@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+
+import '../location/location_service.dart';
 
 /// Modo de la capa de mapa (equivale a `view.mode` de MapLayer del prototipo).
 enum YgMapMode {
@@ -115,15 +119,47 @@ class YgMapController extends ChangeNotifier {
   double _zoom = 1;
   Offset _pan = Offset.zero;
   bool _dragging = false;
+  Future<void> Function(double)? _nativeZoomBy;
+  Future<void> Function(Offset)? _nativePanBy;
+  Future<void> Function()? _nativeReset;
 
   double get zoom => _zoom;
   Offset get pan => _pan;
   bool get dragging => _dragging;
   bool get userMoved => _pan != Offset.zero || _zoom != 1;
 
+  void attachNativeCamera({
+    required Future<void> Function(double) zoomBy,
+    Future<void> Function(Offset)? panBy,
+    required Future<void> Function() reset,
+  }) {
+    _nativeZoomBy = zoomBy;
+    _nativePanBy = panBy;
+    _nativeReset = reset;
+  }
+
+  void detachNativeCamera() {
+    _nativeZoomBy = null;
+    _nativePanBy = null;
+    _nativeReset = null;
+  }
+
   void zoomBy(double f) {
     _zoom = (_zoom * f).clamp(.5, 3.0);
     notifyListeners();
+    final nativeZoomBy = _nativeZoomBy;
+    if (nativeZoomBy != null && f.isFinite && f > 0) {
+      unawaited(nativeZoomBy(f));
+    }
+  }
+
+  void panBy(Offset delta) {
+    if (delta == Offset.zero) return;
+    _pan += delta;
+    _dragging = true;
+    notifyListeners();
+    final nativePanBy = _nativePanBy;
+    if (nativePanBy != null) unawaited(nativePanBy(delta));
   }
 
   void panTo(Offset pan, {bool dragging = false}) {
@@ -138,6 +174,8 @@ class YgMapController extends ChangeNotifier {
     _pan = Offset.zero;
     _dragging = false;
     notifyListeners();
+    final nativeReset = _nativeReset;
+    if (nativeReset != null) unawaited(nativeReset());
   }
 }
 
@@ -150,8 +188,18 @@ class YgMapScope extends ChangeNotifier {
   YgMapView _view = const YgMapView();
   final YgMapController controller = YgMapController();
   Object? _owner;
+  GeoCoordinate? _focusTarget;
+  int _focusRequestVersion = 0;
 
   YgMapView get view => _view;
+  GeoCoordinate? get focusTarget => _focusTarget;
+  int get focusRequestVersion => _focusRequestVersion;
+
+  void focusOn(GeoCoordinate point) {
+    _focusTarget = point;
+    _focusRequestVersion += 1;
+    notifyListeners();
+  }
 
   /// Registra la vista del mapa. [owner] identifica a la pantalla activa; solo
   /// ella puede actualizarla hasta que otra tome el control.

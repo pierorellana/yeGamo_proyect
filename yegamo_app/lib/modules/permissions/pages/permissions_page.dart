@@ -47,8 +47,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
     return YgMapBinding(
       // perm: vb = 844 − (8 + 424) − 16
       view: const YgMapView(mode: YgMapMode.perm, visibleBottom: 396),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+      child: YgMapScaffold(
         body: Stack(
           fit: StackFit.expand,
           children: [

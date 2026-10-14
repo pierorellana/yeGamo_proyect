@@ -1,6 +1,8 @@
 enum AppEnvironment { development, staging, production }
 
 class AppConfig {
+  static const defaultDevelopmentApiBaseUrl =
+      'https://9hqbzkgw-3000.use.devtunnels.ms';
   static const defaultMapStyleUrl =
       'https://tiles.openfreemap.org/styles/positron';
 
@@ -31,7 +33,7 @@ class AppConfig {
     );
     const rawApiBaseUrl = String.fromEnvironment(
       'YEGAMO_API_BASE_URL',
-      defaultValue: 'http://localhost:3000',
+      defaultValue: defaultDevelopmentApiBaseUrl,
     );
     const realMapEnabled = bool.fromEnvironment(
       'YEGAMO_REAL_MAP',

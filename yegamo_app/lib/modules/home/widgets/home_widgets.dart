@@ -566,6 +566,10 @@ class HomeNearCard extends StatelessWidget {
                         nearbyDistanceLabel(stop),
                         style: YgText.meta.copyWith(color: YgColors.text3),
                       ),
+                      Text(
+                        nearbySourceLabel(stop),
+                        style: YgText.meta.copyWith(color: YgColors.text3),
+                      ),
                     ],
                   ),
                 ),

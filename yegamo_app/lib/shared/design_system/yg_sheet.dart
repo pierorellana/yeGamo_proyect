@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
@@ -153,8 +155,21 @@ class _YgSheetState extends State<YgSheet> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void _report() =>
-      widget.onHeightChanged?.call(_h.value, widget.config.bottom);
+  double? _reportedHeight;
+  double? _reportedBottom;
+
+  void _report({double? height, double? bottom}) {
+    final nextHeight = height ?? _h.value;
+    final nextBottom = bottom ?? widget.config.bottom;
+    if (_reportedHeight != null &&
+        (nextHeight - _reportedHeight!).abs() < .5 &&
+        (nextBottom - _reportedBottom!).abs() < .5) {
+      return;
+    }
+    _reportedHeight = nextHeight;
+    _reportedBottom = nextBottom;
+    widget.onHeightChanged?.call(nextHeight, nextBottom);
+  }
 
   void _onSnap() {
     _settle();
@@ -209,14 +224,30 @@ class _YgSheetState extends State<YgSheet> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final c = widget.config;
     final snap = _ctl.snap;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final visibleHeight = math
+        .max(
+          220.0,
+          MediaQuery.sizeOf(context).height - c.bottom - keyboardInset - 8,
+        )
+        .toDouble();
+    final visibleBottom = c.bottom + keyboardInset;
     return Positioned(
       left: 8,
       right: 8,
-      bottom: c.bottom,
+      bottom: visibleBottom,
       child: AnimatedBuilder(
         animation: Listenable.merge([_h, _enter]),
         builder: (context, _) {
-          final h = _h.value.clamp(0.0, 4000.0);
+          final h = math
+              .min(_h.value, visibleHeight)
+              .clamp(0.0, 4000.0)
+              .toDouble();
+          if (_reportedHeight != h || _reportedBottom != visibleBottom) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _report(height: h, bottom: visibleBottom);
+            });
+          }
           return FractionalTranslation(
             translation: Offset(0, 1.05 * (1 - _enter.value)),
             child: _SheetSurface(
@@ -337,28 +368,40 @@ Future<T?> showYgModalSheet<T>(
     transitionDuration: reduce
         ? YgMotion.reduced
         : const Duration(milliseconds: 600),
-    pageBuilder: (context, _, _) => Align(
-      alignment: Alignment.bottomCenter,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        child: Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(YgRadius.sheet),
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 20, child: Center(child: _Grabber())),
-                Flexible(child: builder(context)),
-              ],
+    pageBuilder: (context, _, _) {
+      final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+      final maxHeight = MediaQuery.sizeOf(context).height - keyboardInset - 8;
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(8, 0, 8, 8 + keyboardInset),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: math.max(220.0, maxHeight).toDouble(),
+            ),
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(YgRadius.sheet),
+              elevation: 0,
+              shadowColor: Colors.transparent,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      height: 20,
+                      child: Center(child: _Grabber()),
+                    ),
+                    Flexible(child: builder(context)),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
-    ),
+      );
+    },
     transitionBuilder: (context, anim, _, child) {
       if (reduce) return FadeTransition(opacity: anim, child: child);
       final curved = CurvedAnimation(

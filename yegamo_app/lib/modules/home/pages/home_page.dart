@@ -98,17 +98,17 @@ class _HomePageState extends State<HomePage> {
         _access != null &&
         _access == LocationAccess.granted &&
         state != UxState.permission;
-    final noLocation = (_access != null && !located) ||
-        state == UxState.permission;
+    final noLocation =
+        (_access != null && !located) || state == UxState.permission;
     final copy = HomeDepartureCopy.forState(state, located: !noLocation);
-    final retryable = state == UxState.offline ||
+    final retryable =
+        state == UxState.offline ||
         state == UxState.stale ||
         state == UxState.degraded ||
         state == UxState.error;
     final visibleBottom = 844 - _sheetB - _sheetH - 16;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return YgMapScaffold(
       body: YgMapBinding(
         active: widget.active,
         view: YgMapView(
@@ -157,7 +157,10 @@ class _HomePageState extends State<HomePage> {
                   _sheetB = b;
                 });
               },
-              peek: HomePeek(copy: copy, onPlan: () => _push(AppRoutes.planner)),
+              peek: HomePeek(
+                copy: copy,
+                onPlan: () => _push(AppRoutes.planner),
+              ),
               body: (context, snap) => SingleChildScrollView(
                 physics: snap == YgSnap.max
                     ? const ClampingScrollPhysics()
@@ -247,7 +250,8 @@ class _HomePageState extends State<HomePage> {
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             clipBehavior: Clip.none,
                             itemCount: nearby.stops.length.clamp(0, 6),
-                            separatorBuilder: (_, _) => const SizedBox(width: 8),
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 8),
                             itemBuilder: (_, i) => HomeNearCard(
                               key: ValueKey('home_stop_${nearby.stops[i].id}'),
                               stop: nearby.stops[i],
@@ -292,8 +296,10 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _pad(Widget child) =>
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: child);
+  Widget _pad(Widget child) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: child,
+  );
 
   static String _nearbyHint(UxState state, bool noLocation) {
     if (noLocation) {

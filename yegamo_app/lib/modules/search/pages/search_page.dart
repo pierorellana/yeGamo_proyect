@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,6 +26,7 @@ class _SearchPageState extends State<SearchPage> {
   late final TextEditingController _controller;
   final FocusNode _focus = FocusNode();
   final YgSheetController _sheet = YgSheetController(YgSnap.mid);
+  Timer? _searchDebounce;
   double _sheetH = YgSheetConfig.search.mid;
   double _sheetB = YgSheetConfig.search.bottom;
 
@@ -54,6 +57,7 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _focus.dispose();
     _sheet.dispose();
     _controller.dispose();
@@ -61,10 +65,11 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _search() async {
+    _searchDebounce?.cancel();
     final vm = context.read<SearchViewModel>();
     final text = _controller.text.trim();
     vm.setQuery(_controller.text);
-    if (text.isEmpty) {
+    if (text.length < 3) {
       setState(() => _searched = null);
       return;
     }
@@ -72,6 +77,22 @@ class _SearchPageState extends State<SearchPage> {
     FocusScope.of(context).unfocus();
     _sheet.setSnap(YgSnap.mid);
     await vm.search();
+  }
+
+  void _onQueryChanged(String value) {
+    _searchDebounce?.cancel();
+    final trimmed = value.trim();
+    final vm = context.read<SearchViewModel>();
+    vm.setQuery(value);
+    if (trimmed.length < 3) {
+      vm.loadRecents();
+      setState(() => _searched = null);
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      _search();
+    });
   }
 
   void _useQuery(String value) {
@@ -104,8 +125,7 @@ class _SearchPageState extends State<SearchPage> {
     final state = snapshot.state;
 
     if (state == UxState.noCoverage) {
-      return Scaffold(
-        backgroundColor: Colors.transparent,
+      return YgMapScaffold(
         body: NoCoverageView(
           destination: _searched ?? vm.query,
           onBack: _clear,
@@ -121,9 +141,7 @@ class _SearchPageState extends State<SearchPage> {
         MediaQuery.sizeOf(context).height - _sheetB - _sheetH - 16;
     final showEmpty = state == UxState.empty && _searched != null;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
+    return YgMapScaffold(
       body: YgMapBinding(
         view: YgMapView(
           mode: YgMapMode.search,
@@ -189,6 +207,7 @@ class _SearchPageState extends State<SearchPage> {
                                 ? 'Mi ubicación'
                                 : 'Elige un origen',
                             loading: vm.loading,
+                            onChanged: _onQueryChanged,
                             onSubmit: _search,
                           ),
                           if (saved.isNotEmpty) ...[
@@ -266,9 +285,16 @@ class _SearchPageState extends State<SearchPage> {
                   trailing: result.dataState == DataState.current
                       ? null
                       : YgFreshnessLabel(result.dataState),
-                  onTap: () =>
-                      Navigator.of(context)
-                          .pushNamed(AppRoutes.planner, arguments: result),
+                  onTap: () {
+                    context.read<YgMapScope>().focusOn(
+                      GeoCoordinate(
+                        latitude: result.latitude,
+                        longitude: result.longitude,
+                      ),
+                    );
+                    Navigator.of(context)
+                        .pushNamed(AppRoutes.planner, arguments: result);
+                  },
                 ),
             ],
           ),

@@ -10,6 +10,9 @@ String nearbyDistanceLabel(NearbyStop stop) => stop.distanceM == null
     ? '${(stop.distanceM! / 1000).toStringAsFixed(1).replaceAll('.', ',')} km'
     : '${stop.distanceM!.round()} m';
 
+String nearbySourceLabel(NearbyStop stop) =>
+    stop.source == 'openstreetmap' ? 'OpenStreetMap' : 'Fuente no especificada';
+
 /// Tarjeta de parada (`.scard`): cabecera seleccionable y una fila de
 /// llegadas. Las llegadas solo se muestran si la fuente las entrega; el
 /// contrato de paradas cercanas no incluye ETA, así que se dice con claridad.
@@ -74,6 +77,10 @@ class NearbyStopCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(nearbyDistanceLabel(stop), style: YgText.meta),
+                        Text(
+                          nearbySourceLabel(stop),
+                          style: YgText.meta.copyWith(color: YgColors.text3),
+                        ),
                       ],
                     ),
                   ),

@@ -8,6 +8,7 @@ class NearbyStop {
     required this.name,
     required this.distanceM,
     required this.dataState,
+    this.source,
     this.latitude,
     this.longitude,
   });
@@ -16,6 +17,7 @@ class NearbyStop {
   final String name;
   final double? distanceM;
   final DataState dataState;
+  final String? source;
   final double? latitude;
   final double? longitude;
 
@@ -26,6 +28,7 @@ class NearbyStop {
       distanceM: _number(json['distanceM']),
       dataState:
           DataStateParsing.fromApiValue(json['dataState']) ?? DataState.current,
+      source: json['source'] as String?,
       latitude: _number(_location(json)['lat'] ?? json['lat']),
       longitude: _number(_location(json)['lon'] ?? json['lon']),
     );

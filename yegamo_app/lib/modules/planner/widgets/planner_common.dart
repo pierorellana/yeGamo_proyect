@@ -566,8 +566,7 @@ class _PlannerFlowScaffoldState extends State<PlannerFlowScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return YgMapScaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [

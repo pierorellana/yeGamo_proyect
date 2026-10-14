@@ -12,6 +12,7 @@ class SearchOriginDestination extends StatelessWidget {
     required this.focusNode,
     required this.originText,
     required this.onSubmit,
+    this.onChanged,
     this.loading = false,
   });
 
@@ -19,6 +20,7 @@ class SearchOriginDestination extends StatelessWidget {
   final FocusNode focusNode;
   final String originText;
   final VoidCallback onSubmit;
+  final ValueChanged<String>? onChanged;
   final bool loading;
 
   @override
@@ -120,6 +122,7 @@ class SearchOriginDestination extends StatelessWidget {
                                 controller: controller,
                                 focusNode: focusNode,
                                 textInputAction: TextInputAction.search,
+                                onChanged: onChanged,
                                 onSubmitted: (_) => onSubmit(),
                                 cursorColor: YgColors.cypress,
                                 style: YgText.sub.copyWith(
@@ -211,7 +214,11 @@ class SearchQuickChips extends StatelessWidget {
 
 /// Estado sin resultados (E7): ilustración, título, ayuda y «Borrar búsqueda».
 class SearchEmptyState extends StatelessWidget {
-  const SearchEmptyState({super.key, required this.query, required this.onClear});
+  const SearchEmptyState({
+    super.key,
+    required this.query,
+    required this.onClear,
+  });
 
   final String query;
   final VoidCallback onClear;
@@ -282,7 +289,13 @@ class SearchEmptyState extends StatelessWidget {
 }
 
 class SearchProblem {
-  const SearchProblem(this.title, this.message, this.icon, this.tone, this.retry);
+  const SearchProblem(
+    this.title,
+    this.message,
+    this.icon,
+    this.tone,
+    this.retry,
+  );
 
   final String title;
   final String message;

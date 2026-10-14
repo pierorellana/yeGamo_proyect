@@ -25,7 +25,9 @@ class StepByStepPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final plan = context.watch<PlannerViewModel>().state.plan;
-    final option = plan?.options.isNotEmpty == true ? plan!.options.first : null;
+    final option = plan?.options.isNotEmpty == true
+        ? plan!.options.first
+        : null;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Paso a paso'),
@@ -60,7 +62,9 @@ class StepByStepPage extends StatelessWidget {
                     _JourneyLegTile(index: index, leg: option.legs[index]),
                   if (option.legs.isEmpty)
                     const YgCard(
-                      child: Text('No hay instrucciones disponibles para este plan.'),
+                      child: Text(
+                        'No hay instrucciones disponibles para este plan.',
+                      ),
                     ),
                   const SizedBox(height: 20),
                   YgPrimaryButton(
@@ -105,7 +109,10 @@ class _JourneyLegTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(leg.mode, style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      leg.mode,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     Text('${leg.durationMin} min'),
                     for (final instruction in leg.instructions)
                       Padding(
@@ -143,7 +150,9 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
     if (_startedFromRoute) return;
     _startedFromRoute = true;
     final arguments = ModalRoute.of(context)?.settings.arguments;
-    if (arguments is Map && arguments['planId'] is String && arguments['optionId'] is String) {
+    if (arguments is Map &&
+        arguments['planId'] is String &&
+        arguments['optionId'] is String) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         context.read<JourneyViewModel>().start(
@@ -209,14 +218,18 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
   }
 
   Widget _buildEmpty(JourneyViewModel vm) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return YgMapScaffold(
       body: YgBackground(
         child: Stack(
           children: [
             Positioned.fill(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, YgSize.topbarY + 56, 16, 24),
+                padding: const EdgeInsets.fromLTRB(
+                  16,
+                  YgSize.topbarY + 56,
+                  16,
+                  24,
+                ),
                 child: ListView(
                   children: [
                     RemoteStateView(state: vm.state.uxState, onRetry: null),
@@ -254,11 +267,15 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
     final phase = tripPhaseFor(journey, option);
     final leg = legIndex == null ? null : option!.legs[legIndex];
     final legKind = leg == null ? null : legKindOf(leg);
-    final instruction = journey.instruction ??
-        (leg != null && leg.instructions.isNotEmpty ? leg.instructions.first : null);
+    final instruction =
+        journey.instruction ??
+        (leg != null && leg.instructions.isNotEmpty
+            ? leg.instructions.first
+            : null);
     final nextStop = journey.nextStop;
     final icon = switch (legKind) {
-      JourneyLegKind.walk => phase == YgTripPhase.done ? YgIcons.bandera : YgIcons.caminar,
+      JourneyLegKind.walk =>
+        phase == YgTripPhase.done ? YgIcons.bandera : YgIcons.caminar,
       JourneyLegKind.wait => YgIcons.reloj,
       JourneyLegKind.ride => YgIcons.bus,
       null => YgIcons.navegar,
@@ -287,8 +304,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
         fit: _fit,
         visibleBottom: visibleBottom,
       ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+      child: YgMapScaffold(
         body: YgEnter(
           kind: YgEnterKind.fade,
           child: Stack(
@@ -301,7 +317,8 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
                   child: JourneyInstructionCard(
                     icon: icon,
                     walkStyle:
-                        legKind == JourneyLegKind.walk || phase == YgTripPhase.done,
+                        legKind == JourneyLegKind.walk ||
+                        phase == YgTripPhase.done,
                     pre: pre,
                     title: title,
                     sub: sub,
@@ -326,16 +343,18 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
                               key: const ValueKey('journey_open_get_off'),
                               label: 'Ver alerta de bajada',
                               icon: YgIcons.campana,
-                              onTap: () => Navigator.of(context).pushNamed(
-                                AppRoutes.getOffAlert,
-                              ),
+                              onTap: () =>
+                                  Navigator.of(context)
+                                      .pushNamed(AppRoutes.getOffAlert),
                             )
                           else
                             JourneyGlassChip(
                               key: const ValueKey('journey_next_step'),
                               label: 'Siguiente paso',
                               icon: YgIcons.acelerar,
-                              onTap: vm.loading ? null : () => _updateStep(context, journey),
+                              onTap: vm.loading
+                                  ? null
+                                  : () => _updateStep(context, journey),
                             ),
                           JourneyGlassChip(
                             key: const ValueKey('journey_update_location'),
@@ -373,7 +392,9 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
                 handleLabel: 'Cambiar altura del panel del viaje',
                 onHeightChanged: (h, b) {
                   if (!mounted) return;
-                  if ((h - _sheetHeight).abs() < .5 && b == _sheetBottom) return;
+                  if ((h - _sheetHeight).abs() < .5 && b == _sheetBottom) {
+                    return;
+                  }
                   setState(() {
                     _sheetHeight = h;
                     _sheetBottom = b;
@@ -409,7 +430,8 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
     final sameplan = plan?.planId == journey.planId;
     final from = sameplan ? plan?.arrivalFrom : null;
     final to = sameplan ? plan?.arrivalTo : null;
-    final inWindow = from != null &&
+    final inWindow =
+        from != null &&
         to != null &&
         !arrivedAt.isBefore(from) &&
         !arrivedAt.isAfter(to);
@@ -534,8 +556,9 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
                               variant: YgButtonVariant.ghost,
                               size: YgButtonSize.md,
                               expand: true,
-                              onPressed: () => Navigator.of(context)
-                                  .popUntil((route) => route.isFirst),
+                              onPressed: () =>
+                                  Navigator.of(context)
+                                      .popUntil((route) => route.isFirst),
                             ),
                           ],
                         ),
@@ -557,11 +580,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
         ? JourneyStatus.arrived
         : JourneyStatus.active;
     await context.read<JourneyViewModel>().updateProgress(
-      JourneyProgress(
-        stepIndex: next,
-        status: status,
-        sequence: next,
-      ),
+      JourneyProgress(stepIndex: next, status: status, sequence: next),
     );
   }
 
@@ -638,7 +657,9 @@ class _ActiveSheetBody extends StatelessWidget {
         if (!showAll && state == JourneyStopState.pass) continue;
         rows.add(
           JourneyStopRow(
-            title: leg.instructions.isNotEmpty ? leg.instructions.first : leg.mode,
+            title: leg.instructions.isNotEmpty
+                ? leg.instructions.first
+                : leg.mode,
             state: state,
             trailing: '${leg.durationMin} min',
           ),
@@ -691,7 +712,8 @@ class GetOffAlertPage extends StatelessWidget {
     if (legs.length > 1 && legKindOf(legs.last) == JourneyLegKind.walk) {
       lastWalk = legs.last;
     }
-    final eta = journey?.eta != null && journey?.dataState != DataState.unavailable
+    final eta =
+        journey?.eta != null && journey?.dataState != DataState.unavailable
         ? formatClock(journey!.eta!)
         : null;
     final footParts = <String>[

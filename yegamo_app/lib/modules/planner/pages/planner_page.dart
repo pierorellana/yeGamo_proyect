@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../shared/design_system/yg_components.dart';
+import '../../../shared/location/location_service.dart';
 import '../../../shared/map/yg_map_view.dart';
+import '../../../shared/models/data_state.dart';
 import '../../../shared/navigation/app_routes.dart';
 import '../../search/models/search_models.dart';
+import '../../search/providers/search_view_model.dart';
 import '../models/planner_models.dart';
 import '../providers/planner_view_model.dart';
 import '../widgets/planner_common.dart';
@@ -21,13 +23,18 @@ class PlannerPage extends StatefulWidget {
 class _PlannerPageState extends State<PlannerPage> {
   late final TextEditingController _originController;
   late final TextEditingController _destinationController;
+  late final FocusNode _originFocus;
+  late final FocusNode _destinationFocus;
 
   /// 0 = hoy, 1 = mañana.
   int _day = 0;
   int _minutes = 0;
   String? _inputError;
-  JourneyPoint? _argumentDestination;
-  String? _argumentDestinationLabel;
+  JourneyPoint? _originPoint;
+  JourneyPoint? _destinationPoint;
+  String? _originLabel;
+  String? _destinationLabel;
+  _PlannerField? _activeField;
   bool _routeArgumentsRead = false;
 
   static const _margins = [0, 5, 10, 15];
@@ -35,9 +42,11 @@ class _PlannerPageState extends State<PlannerPage> {
   @override
   void initState() {
     super.initState();
-    _originController = TextEditingController()..addListener(_refresh);
+    _originController = TextEditingController()..addListener(_onOriginChanged);
     _destinationController = TextEditingController()
       ..addListener(_onDestinationChanged);
+    _originFocus = FocusNode();
+    _destinationFocus = FocusNode();
     final vm = context.read<PlannerViewModel>();
     final now = DateTime.now();
     final saved = vm.targetTime;
@@ -49,6 +58,7 @@ class _PlannerPageState extends State<PlannerPage> {
       final m = t.hour * 60 + t.minute;
       _minutes = ((m + 4) ~/ 5 * 5) % 1440;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrentOrigin());
   }
 
   @override
@@ -58,11 +68,11 @@ class _PlannerPageState extends State<PlannerPage> {
     _routeArgumentsRead = true;
     final arguments = ModalRoute.of(context)?.settings.arguments;
     if (arguments is! PlaceResult) return;
-    _argumentDestination = JourneyPoint(
+    _destinationPoint = JourneyPoint(
       latitude: arguments.latitude,
       longitude: arguments.longitude,
     );
-    _argumentDestinationLabel = arguments.name;
+    _destinationLabel = arguments.name;
     _destinationController.text = arguments.name;
   }
 
@@ -70,6 +80,8 @@ class _PlannerPageState extends State<PlannerPage> {
   void dispose() {
     _originController.dispose();
     _destinationController.dispose();
+    _originFocus.dispose();
+    _destinationFocus.dispose();
     super.dispose();
   }
 
@@ -77,11 +89,28 @@ class _PlannerPageState extends State<PlannerPage> {
     if (mounted) setState(() {});
   }
 
+  void _onOriginChanged() {
+    if (_originLabel != _originController.text) _originPoint = null;
+    _refresh();
+  }
+
   void _onDestinationChanged() {
-    if (_argumentDestinationLabel != _destinationController.text) {
-      _argumentDestination = null;
+    if (_destinationLabel != _destinationController.text) {
+      _destinationPoint = null;
     }
     _refresh();
+  }
+
+  Future<void> _loadCurrentOrigin() async {
+    final position = await context.read<LocationService>().currentPosition();
+    if (!mounted || position == null || _originPoint != null) return;
+    _originLabel = 'Mi ubicación';
+    _originController.text = _originLabel!;
+    _originPoint = JourneyPoint(
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
+    setState(() {});
   }
 
   DateTime get _target {
@@ -90,22 +119,13 @@ class _PlannerPageState extends State<PlannerPage> {
     return base.add(Duration(minutes: _minutes));
   }
 
-  JourneyPoint? _parse(String value) {
-    final values = value
-        .split(',')
-        .map((part) => double.tryParse(part.trim()))
-        .toList();
-    if (values.length != 2 || values.any((part) => part == null)) return null;
-    return JourneyPoint(latitude: values[0]!, longitude: values[1]!);
-  }
-
   Future<void> _calculate() async {
-    final origin = _parse(_originController.text);
-    final destination =
-        _parse(_destinationController.text) ?? _argumentDestination;
+    final origin = _originPoint;
+    final destination = _destinationPoint;
     if (origin == null || destination == null) {
       setState(
-        () => _inputError = 'Indica origen y destino como latitud, longitud.',
+        () => _inputError =
+            'Selecciona un origen y un destino de la lista de lugares.',
       );
       return;
     }
@@ -123,8 +143,62 @@ class _PlannerPageState extends State<PlannerPage> {
 
   void _swap() {
     final o = _originController.text;
-    _originController.text = _destinationController.text;
+    final d = _destinationController.text;
+    final oPoint = _originPoint;
+    final dPoint = _destinationPoint;
+    final oLabel = _originLabel;
+    final dLabel = _destinationLabel;
+    _originLabel = dLabel;
+    _destinationLabel = oLabel;
+    _originPoint = dPoint;
+    _destinationPoint = oPoint;
+    _originController.text = d;
     _destinationController.text = o;
+    setState(() {
+      _activeField = null;
+      _inputError = null;
+    });
+  }
+
+  Future<void> _searchField(_PlannerField field) async {
+    final controller = field == _PlannerField.origin
+        ? _originController
+        : _destinationController;
+    final query = controller.text.trim();
+    if (query.length < 3) {
+      setState(
+        () => _inputError = 'Escribe al menos 3 caracteres para buscar.',
+      );
+      return;
+    }
+    setState(() {
+      _activeField = field;
+      _inputError = null;
+    });
+    FocusScope.of(context).unfocus();
+    await context.read<SearchViewModel>().search(query);
+    if (mounted) setState(() {});
+  }
+
+  void _selectPlace(_PlannerField field, PlaceResult place) {
+    final point = JourneyPoint(
+      latitude: place.latitude,
+      longitude: place.longitude,
+    );
+    if (field == _PlannerField.origin) {
+      _originLabel = place.name;
+      _originPoint = point;
+      _originController.text = place.name;
+    } else {
+      _destinationLabel = place.name;
+      _destinationPoint = point;
+      _destinationController.text = place.name;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _activeField = null;
+      _inputError = null;
+    });
   }
 
   void _shift(int delta) {
@@ -182,6 +256,7 @@ class _PlannerPageState extends State<PlannerPage> {
   }
 
   Widget _form(BuildContext context, PlannerViewModel vm) {
+    final search = context.watch<SearchViewModel>();
     final arrive = vm.timeMode != TimeMode.leaveNow;
     final target = _target;
     final timeIndex = switch (vm.timeMode) {
@@ -197,8 +272,24 @@ class _PlannerPageState extends State<PlannerPage> {
         _OriginDestination(
           origin: _originController,
           destination: _destinationController,
+          originFocus: _originFocus,
+          destinationFocus: _destinationFocus,
+          onOriginTap: () =>
+              setState(() => _activeField = _PlannerField.origin),
+          onDestinationTap: () =>
+              setState(() => _activeField = _PlannerField.destination),
+          onOriginSubmit: () => _searchField(_PlannerField.origin),
+          onDestinationSubmit: () => _searchField(_PlannerField.destination),
           onSwap: _swap,
         ),
+        if (_activeField != null) ...[
+          const SizedBox(height: 12),
+          _PlaceSuggestions(
+            field: _activeField!,
+            search: search,
+            onSelect: _selectPlace,
+          ),
+        ],
         Padding(
           padding: const EdgeInsets.only(top: 16),
           child: YgSegmented(
@@ -390,11 +481,23 @@ class _OriginDestination extends StatelessWidget {
   const _OriginDestination({
     required this.origin,
     required this.destination,
+    required this.originFocus,
+    required this.destinationFocus,
+    required this.onOriginTap,
+    required this.onDestinationTap,
+    required this.onOriginSubmit,
+    required this.onDestinationSubmit,
     required this.onSwap,
   });
 
   final TextEditingController origin;
   final TextEditingController destination;
+  final FocusNode originFocus;
+  final FocusNode destinationFocus;
+  final VoidCallback onOriginTap;
+  final VoidCallback onDestinationTap;
+  final VoidCallback onOriginSubmit;
+  final VoidCallback onDestinationSubmit;
   final VoidCallback onSwap;
 
   @override
@@ -416,6 +519,7 @@ class _OriginDestination extends StatelessWidget {
                 _OdRow(
                   fieldKey: const ValueKey('planner_origin'),
                   controller: origin,
+                  focusNode: originFocus,
                   label: 'Desde',
                   dot: Container(
                     width: 10,
@@ -431,6 +535,8 @@ class _OriginDestination extends StatelessWidget {
                       ],
                     ),
                   ),
+                  onTap: onOriginTap,
+                  onSubmitted: onOriginSubmit,
                 ),
                 Container(
                   height: 1,
@@ -440,6 +546,7 @@ class _OriginDestination extends StatelessWidget {
                 _OdRow(
                   fieldKey: const ValueKey('planner_destination'),
                   controller: destination,
+                  focusNode: destinationFocus,
                   label: 'Hasta',
                   dot: Container(
                     width: 10,
@@ -449,6 +556,8 @@ class _OriginDestination extends StatelessWidget {
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
+                  onTap: onDestinationTap,
+                  onSubmitted: onDestinationSubmit,
                 ),
               ],
             ),
@@ -491,14 +600,20 @@ class _OdRow extends StatelessWidget {
   const _OdRow({
     required this.fieldKey,
     required this.controller,
+    required this.focusNode,
     required this.label,
     required this.dot,
+    required this.onTap,
+    required this.onSubmitted,
   });
 
   final Key fieldKey;
   final TextEditingController controller;
+  final FocusNode focusNode;
   final String label;
   final Widget dot;
+  final VoidCallback onTap;
+  final VoidCallback onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -526,14 +641,12 @@ class _OdRow extends StatelessWidget {
                   TextField(
                     key: fieldKey,
                     controller: controller,
+                    focusNode: focusNode,
+                    onTap: onTap,
+                    onSubmitted: (_) => onSubmitted(),
                     cursorColor: YgColors.cypress,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,\-\s]')),
-                    ],
+                    textInputAction: TextInputAction.search,
+                    keyboardType: TextInputType.streetAddress,
                     style: YgText.sub.copyWith(
                       height: 1.3,
                       letterSpacing: -.15,
@@ -546,7 +659,7 @@ class _OdRow extends StatelessWidget {
                       focusedBorder: InputBorder.none,
                       filled: false,
                       contentPadding: EdgeInsets.symmetric(vertical: 2),
-                      hintText: 'latitud, longitud',
+                      hintText: 'Busca una dirección o lugar',
                       hintStyle: TextStyle(
                         color: YgColors.cedar,
                         fontWeight: FontWeight.w500,
@@ -560,6 +673,59 @@ class _OdRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+enum _PlannerField { origin, destination }
+
+class _PlaceSuggestions extends StatelessWidget {
+  const _PlaceSuggestions({
+    required this.field,
+    required this.search,
+    required this.onSelect,
+  });
+
+  final _PlannerField field;
+  final SearchViewModel search;
+  final void Function(_PlannerField field, PlaceResult place) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    if (search.loading) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: YgSpinner(size: 22, width: 2.5)),
+      );
+    }
+    final state = search.snapshot.state;
+    if (state == UxState.error || state == UxState.offline) {
+      return const YgBanner(
+        title: 'No pudimos buscar',
+        message: 'Comprueba la conexión e inténtalo de nuevo.',
+        icon: YgIcons.alerta,
+      );
+    }
+    final results = search.snapshot.results;
+    if (results.isEmpty) {
+      return const YgBanner(
+        title: 'Sin resultados',
+        message: 'Prueba con una dirección, avenida o lugar conocido.',
+        icon: YgIcons.buscar,
+      );
+    }
+    return YgGroup(
+      children: [
+        for (final place in results.take(5))
+          YgListRow(
+            key: ValueKey('planner_place_${place.id}'),
+            icon: YgIcons.mapa,
+            title: place.name,
+            subtitle: place.source ?? 'Lugar encontrado',
+            showChevron: true,
+            onTap: () => onSelect(field, place),
+          ),
+      ],
     );
   }
 }

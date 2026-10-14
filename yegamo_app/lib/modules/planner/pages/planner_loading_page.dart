@@ -58,8 +58,7 @@ class _PlannerLoadingPageState extends State<PlannerLoadingPage>
         mode: YgMapMode.loading,
         visibleBottom: h - 8 - sheetH - 16,
       ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+      child: YgMapScaffold(
         body: Stack(
           fit: StackFit.expand,
           children: [
@@ -92,7 +91,9 @@ class _PlannerLoadingPageState extends State<PlannerLoadingPage>
                           children: [
                             Row(
                               children: [
-                                const _LoadRing(key: ValueKey('planner_progress')),
+                                const _LoadRing(
+                                  key: ValueKey('planner_progress'),
+                                ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
@@ -144,7 +145,7 @@ class _PlannerLoadingPageState extends State<PlannerLoadingPage>
                         key: const ValueKey('planner_cancel'),
                         label: 'Cancelar',
                         variant: YgButtonVariant.secondary,
-                                                expand: true,
+                        expand: true,
                         onPressed: () {
                           context.read<PlannerViewModel>().cancel();
                           Navigator.of(context).pop();

@@ -8,6 +8,7 @@ import '../../modules/notifications/pages/notifications_page.dart';
 import '../../modules/notifications/providers/notifications_view_model.dart';
 import '../../modules/onboarding/task_five_app.dart';
 import '../design_system/yg_components.dart';
+import '../map/yg_map_host.dart';
 import 'app_routes.dart';
 
 class AppShellController extends ChangeNotifier {
@@ -48,8 +49,7 @@ class AppNavigator extends StatelessWidget {
       (vm) => vm.state.unreadCount,
     );
     final index = controller.selectedIndex;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return YgMapScaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [

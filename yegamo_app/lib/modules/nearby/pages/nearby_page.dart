@@ -87,8 +87,7 @@ class _NearbyPageState extends State<NearbyPage> {
         : '1 km';
 
     if (state == UxState.noCoverage) {
-      return Scaffold(
-        backgroundColor: Colors.transparent,
+      return YgMapScaffold(
         body: NoCoverageView(
           onBack: () => Navigator.of(context).maybePop(),
           onChangeDestination: () =>
@@ -103,8 +102,7 @@ class _NearbyPageState extends State<NearbyPage> {
     final sel = stops.isEmpty ? 0 : _sel.clamp(0, stops.length - 1);
     final visibleBottom = 844 - _sheetB - _sheetH - 16;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return YgMapScaffold(
       body: YgMapBinding(
         view: YgMapView(
           mode: YgMapMode.nearby,
@@ -368,8 +366,8 @@ class _StateCard extends StatelessWidget {
       UxState.empty => (
         YgIcons.bus,
         YgTileTone.normal,
-        'Sin paradas cercanas',
-        'No hay paradas en un radio de 1 km. Prueba con otro origen.',
+        'Sin paradas mapeadas cerca de ti',
+        'No encontramos paradas de transporte en OpenStreetMap dentro del radio seleccionado.',
         false,
       ),
       UxState.permission => (
@@ -390,7 +388,7 @@ class _StateCard extends StatelessWidget {
         YgIcons.alerta,
         YgTileTone.aloe,
         'Datos limitados',
-        'No hay una fuente autorizada de paradas en este momento.',
+        'OpenStreetMap aporta ubicaciones de paradas; todavía no hay horarios ni posiciones en vivo.',
         true,
       ),
       _ => (

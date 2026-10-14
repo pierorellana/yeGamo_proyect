@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,6 +12,101 @@ import '../models/data_state.dart';
 import 'yg_map.dart';
 import 'yg_real_map.dart';
 import 'yg_map_view.dart';
+
+/// Superficie transparente para pantallas que viven sobre el mapa persistente.
+///
+/// Un [Scaffold] normal crea un [Material] tipo canvas que participa en el
+/// hit-test de toda la pantalla, incluso con fondo transparente. Eso impide
+/// que el mapa que está debajo reciba arrastres y pellizcos en las zonas sin
+/// controles. Este material transparente conserva los descendientes
+/// interactivos y deja pasar los gestos por el resto de la superficie.
+class YgMapScaffold extends StatelessWidget {
+  const YgMapScaffold({super.key, required this.body});
+
+  final Widget body;
+
+  @override
+  Widget build(BuildContext context) =>
+      Material(type: MaterialType.transparency, child: body);
+}
+
+/// Captura los gestos en la zona libre del mapa persistente.
+///
+/// El mapa nativo vive bajo el Navigator, y el Navigator participa en el
+/// hit-test aunque su ruta sea visualmente transparente. Por eso esta capa
+/// envuelve al Navigator y comparte sus eventos con él. Solo acepta gestos
+/// cuyo inicio esté sobre el área libre del mapa; los paneles, botones y
+/// campos siguen usando sus propios recognizers.
+class YgMapGestureSurface extends StatefulWidget {
+  const YgMapGestureSurface({
+    super.key,
+    required this.controller,
+    required this.mapBottom,
+    required this.child,
+  });
+
+  final YgMapController controller;
+  final double mapBottom;
+  final Widget child;
+
+  @override
+  State<YgMapGestureSurface> createState() => _YgMapGestureSurfaceState();
+}
+
+class _YgMapGestureSurfaceState extends State<YgMapGestureSurface> {
+  static const _pinchZoomSensitivity = 20.0;
+
+  double _lastScale = 1;
+
+  void _onScaleStart(ScaleStartDetails _) => _lastScale = 1;
+
+  void _onScaleUpdate(ScaleUpdateDetails details) {
+    widget.controller.panBy(details.focalPointDelta);
+    final scale = details.scale;
+    if (!scale.isFinite || scale <= 0) return;
+    final factor = scale / _lastScale;
+    if ((factor - 1).abs() >= .001) {
+      final adjustedFactor = math.pow(factor, _pinchZoomSensitivity).toDouble();
+      widget.controller.zoomBy(adjustedFactor);
+      _lastScale = scale;
+    }
+  }
+
+  void _onScaleEnd(ScaleEndDetails _) => _lastScale = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    return RawGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      gestures: <Type, GestureRecognizerFactory>{
+        _YgMapScaleGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<_YgMapScaleGestureRecognizer>(
+              () => _YgMapScaleGestureRecognizer(mapBottom: widget.mapBottom),
+              (recognizer) {
+                recognizer
+                  ..mapBottom = widget.mapBottom
+                  ..onStart = _onScaleStart
+                  ..onUpdate = _onScaleUpdate
+                  ..onEnd = _onScaleEnd;
+              },
+            ),
+      },
+      child: widget.child,
+    );
+  }
+}
+
+class _YgMapScaleGestureRecognizer extends ScaleGestureRecognizer {
+  _YgMapScaleGestureRecognizer({required this.mapBottom});
+
+  double mapBottom;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    if (event.localPosition.dy >= mapBottom) return;
+    super.addAllowedPointer(event);
+  }
+}
 
 /// Mapa persistente bajo el `Navigator` (se monta en `MaterialApp.builder`).
 /// Las pantallas con mapa son transparentes y declaran su [YgMapView] con
@@ -53,7 +151,10 @@ class YgMapHost extends StatelessWidget {
                   view: scope.view,
                   config: config,
                   locationService: context.read<LocationService>(),
+                  mapController: scope.controller,
                   points: points,
+                  focusTarget: scope.focusTarget,
+                  focusRequestVersion: scope.focusRequestVersion,
                 )
               : YgMap(
                   view: scope.view,
@@ -61,7 +162,17 @@ class YgMapHost extends StatelessWidget {
                   showDemoOverlays: config.demoDataEnabled,
                 ),
         ),
-        ?child,
+        if (config.realMapEnabled)
+          ListenableBuilder(
+            listenable: scope,
+            builder: (context, _) => YgMapGestureSurface(
+              controller: scope.controller,
+              mapBottom: scope.view.visibleBottom,
+              child: child ?? const SizedBox.expand(),
+            ),
+          )
+        else
+          ?child,
       ],
     );
   }
