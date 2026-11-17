@@ -24,6 +24,7 @@ void main() {
     final storage = InMemoryLocalStorage();
     // Los viajes activos del API exigen sesión; el invitado sigue en modo local.
     await storage.write(YeGamoStorageKeys.sessionMode, 'authenticated');
+    await storage.writeSecure('access_token', 'test-token');
     await storage.write(YeGamoStorageKeys.onboardingCompleted, 'true');
     final apiClient = testClient((request) async {
       if (request.uri.path == '/v1/journeys/plan') {

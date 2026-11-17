@@ -287,6 +287,7 @@ void main() {
       final storage = InMemoryLocalStorage();
       await storage.write('onboarding_completed', 'true');
       await storage.write(YeGamoStorageKeys.sessionMode, 'authenticated');
+      await storage.writeSecure('access_token', 'test-token');
       final ApiClient client = testClient((request) async {
         if (request.uri.path.contains('active-journeys') ||
             request.uri.path.endsWith('/start')) {
@@ -323,9 +324,16 @@ void main() {
         },
       );
       await tester.pump();
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 100)),
-      );
+      // Espera (con tope) a que el viaje responda; no depende de un retardo fijo.
+      final journeys = tester
+          .element(find.byType(Navigator).first)
+          .read<JourneyViewModel>();
+      for (var i = 0; i < 100 && journeys.state.journey == null; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 30)),
+        );
+        await tester.pump(const Duration(milliseconds: 16));
+      }
       await tester.pump(const Duration(milliseconds: 1500));
       await tester.pump(const Duration(milliseconds: 1500));
       return navigator;
