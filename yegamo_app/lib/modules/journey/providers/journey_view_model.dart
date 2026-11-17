@@ -38,6 +38,17 @@ class JourneyViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Estado de pantalla: se superó el último tramo. No se envía al API.
+  void markArrived() {
+    final journey = _state.journey;
+    if (journey == null) return;
+    _state = JourneyState(
+      journey: journey.copyWith(status: JourneyStatus.arrived),
+      uxState: _state.uxState,
+    );
+    notifyListeners();
+  }
+
   void showGetOffAlert() {
     final journey = _state.journey;
     if (journey == null) return;

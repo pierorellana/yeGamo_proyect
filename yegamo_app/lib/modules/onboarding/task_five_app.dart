@@ -154,7 +154,6 @@ class TaskFiveScope extends StatelessWidget {
               context.read<ApiClient>(),
               context.read<LocalStorage>(),
               context.read<ConnectivityService>(),
-              context.read<LocationConsentStore>(),
               locationReader,
             ),
           ),

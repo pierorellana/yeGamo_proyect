@@ -13,7 +13,6 @@ class ActiveJourneyRepository {
     this._apiClient,
     this._storage,
     this._connectivity,
-    this._consentStore,
     this._locationReader,
   );
 
@@ -21,20 +20,16 @@ class ActiveJourneyRepository {
   final ApiClient _apiClient;
   final LocalStorage _storage;
   final ConnectivityService _connectivity;
-  final LocationConsentStore _consentStore;
   final PrivacyAwareLocationReader _locationReader;
 
   Future<ActiveJourneyResult> start(String planId, String optionId) async {
-    final consent = await _consentStore.read();
     if (!await _connectivity.isOnline) return _offlineResult();
+    // Una clave por intento: reiniciar el mismo plan tras cancelar no debe
+    // reproducir la respuesta del viaje anterior.
+    final attempt = DateTime.now().microsecondsSinceEpoch;
     final response = await _apiClient.post<Object?>(
-      'active-journeys',
-      body: {
-        'planId': planId,
-        'optionId': optionId,
-        'locationConsent': consent,
-      },
-      idempotencyKey: 'journey-start-$planId-$optionId',
+      'journeys/$planId/options/$optionId/start',
+      idempotencyKey: 'journey-start-$planId-$optionId-$attempt',
     );
     return await _map(response);
   }
@@ -48,10 +43,12 @@ class ActiveJourneyRepository {
     }
     final location = await _locationReader.readIfConsented();
     if (!await _connectivity.isOnline) return _offlineResult(cached: cached);
+    final body = progress.toJson(preciseLocation: location);
     final response = await _apiClient.patch<Object?>(
       'active-journeys/${cached.id}/progress',
-      body: progress.toJson(preciseLocation: location),
-      idempotencyKey: 'journey-progress-${cached.id}-${progress.sequence}',
+      body: body,
+      idempotencyKey:
+          'journey-progress-${cached.id}-${progress.currentLegIndex}-${body['occurredAt']}',
     );
     return await _map(response, fallback: cached);
   }
@@ -119,7 +116,17 @@ class ActiveJourneyRepository {
         ),
       );
     }
-    final journey = ActiveJourney.fromJson(Map<String, Object?>.from(body));
+    final ActiveJourney journey;
+    try {
+      journey = ActiveJourney.fromJson(Map<String, Object?>.from(body));
+    } on FormatException catch (error) {
+      return ActiveJourneyResult(
+        error: ApiError(
+          code: 'INVALID_RESPONSE',
+          message: 'La respuesta del viaje no coincide con el contrato: ${error.message}',
+        ),
+      );
+    }
     await _writeCache(journey);
     return ActiveJourneyResult(journey: journey);
   }
@@ -133,6 +140,8 @@ class ActiveJourneyRepository {
           ? ActiveJourney.fromJson(Map<String, Object?>.from(value))
           : null;
     } on FormatException {
+      // Caché de una versión anterior o corrupta: se descarta, no se inventa.
+      await _storage.remove(cacheKey);
       return null;
     }
   }

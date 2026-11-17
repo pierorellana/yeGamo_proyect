@@ -39,6 +39,14 @@ class JourneyPoint {
     'lat': latitude,
     'lon': longitude,
   };
+
+  static JourneyPoint? tryParse(Object? raw) {
+    if (raw is! Map) return null;
+    final lat = raw['lat'];
+    final lon = raw['lon'];
+    if (lat is! num || lon is! num) return null;
+    return JourneyPoint(latitude: lat.toDouble(), longitude: lon.toDouble());
+  }
 }
 
 class JourneyPlanRequest {
@@ -64,7 +72,7 @@ class JourneyPlanRequest {
     'origin': origin.toJson(),
     'destination': destination.toJson(),
     'timeMode': timeMode.apiValue,
-    if (time != null) 'time': time!.toIso8601String(),
+    if (time != null) 'time': time!.toUtc().toIso8601String(),
     'preference': preference.apiValue,
     'maxWalkMin': maxWalkMin,
     'extraSafetyMarginMin': extraSafetyMarginMin,
@@ -86,6 +94,14 @@ class JourneyDataQuality {
   final DateTime? observedAt;
   final String? providerDisplayName;
 
+  Map<String, Object?> toJson() => <String, Object?>{
+    'dataState': dataState.apiValue,
+    'liveVehicle': liveVehicle,
+    'sourceAuthorized': sourceAuthorized,
+    'observedAt': observedAt?.toUtc().toIso8601String(),
+    'providerDisplayName': providerDisplayName,
+  };
+
   factory JourneyDataQuality.fromJson(Map<String, Object?> json) {
     return JourneyDataQuality(
       dataState:
@@ -106,6 +122,11 @@ class JourneyLeg {
     this.instructions = const [],
     this.departureAt,
     this.arrivalAt,
+    this.from,
+    this.to,
+    this.routeId,
+    this.fromStopId,
+    this.toStopId,
   });
 
   final String mode;
@@ -113,6 +134,11 @@ class JourneyLeg {
   final List<String> instructions;
   final DateTime? departureAt;
   final DateTime? arrivalAt;
+  final JourneyPoint? from;
+  final JourneyPoint? to;
+  final String? routeId;
+  final String? fromStopId;
+  final String? toStopId;
 
   factory JourneyLeg.fromJson(Map<String, Object?> json) {
     return JourneyLeg(
@@ -125,8 +151,26 @@ class JourneyLeg {
           const [],
       departureAt: _date(json['departureAt']),
       arrivalAt: _date(json['arrivalAt']),
+      from: JourneyPoint.tryParse(json['from']),
+      to: JourneyPoint.tryParse(json['to']),
+      routeId: json['routeId'] as String?,
+      fromStopId: json['fromStopId'] as String?,
+      toStopId: json['toStopId'] as String?,
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'mode': mode,
+    'durationMin': durationMin,
+    'instructions': instructions,
+    'departureAt': departureAt?.toUtc().toIso8601String(),
+    'arrivalAt': arrivalAt?.toUtc().toIso8601String(),
+    if (from != null) 'from': from!.toJson(),
+    if (to != null) 'to': to!.toJson(),
+    'routeId': routeId,
+    'fromStopId': fromStopId,
+    'toStopId': toStopId,
+  };
 }
 
 class JourneyOption {

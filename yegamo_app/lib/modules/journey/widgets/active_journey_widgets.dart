@@ -233,9 +233,9 @@ class JourneySheetHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final eta = journey.eta;
     final hasEta = eta != null && journey.dataState != DataState.unavailable;
-    final left = journey.totalSteps - journey.currentStep;
-    final total = journey.totalSteps;
-    final progress = total <= 0 ? 0.0 : journey.currentStep / total;
+    final left = journey.totalLegs - journey.currentLegIndex;
+    final total = journey.totalLegs;
+    final progress = total <= 0 ? 0.0 : journey.currentLegIndex / total;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(

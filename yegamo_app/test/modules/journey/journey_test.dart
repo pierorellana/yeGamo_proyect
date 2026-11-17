@@ -21,60 +21,150 @@ import 'package:yegamo_app/shared/storage/local_storage.dart';
 
 import '../test_support.dart';
 
+Map<String, Object?> _leg(String mode, String instruction) => {
+  'mode': mode,
+  'from': {'lat': -2.17, 'lon': -79.9},
+  'to': {'lat': -2.14, 'lon': -79.89},
+  'durationMin': 5,
+  'departureAt': null,
+  'arrivalAt': null,
+  'instructions': [instruction],
+  'routeId': null,
+  'fromStopId': null,
+  'toStopId': null,
+};
+
+/// Respuesta con la forma exacta del schema `ActiveJourney` de OpenAPI.
 Map<String, Object?> activeJourneyBody({
   String status = 'ACTIVE',
   String dataState = 'DEGRADED',
+  int currentLegIndex = 0,
 }) => <String, Object?>{
   'id': 'journey-1',
   'planId': 'plan-1',
   'optionId': 'option-1',
   'status': status,
+  'currentLegIndex': currentLegIndex,
+  'legs': [
+    _leg('WALK', 'Camina hasta la parada'),
+    _leg('TRANSIT', 'Aborda el servicio'),
+  ],
+  'eta': null,
   'dataState': dataState,
-  'currentStep': 0,
-  'totalSteps': 2,
-  'instruction': 'Camina hasta la parada',
-  'nextStop': 'Parada Central',
-  'sourceAuthorized': false,
-  'liveVehicle': false,
+  'dataQuality': {
+    'freshness': 'UNKNOWN',
+    'dataState': dataState,
+    'liveVehicle': false,
+    'observedAt': null,
+    'providerDisplayName': null,
+    'sourceAuthorized': false,
+  },
+  'events': <Object?>[],
 };
 
 void main() {
-  test('starts and progresses without persisting a precise coordinate', () async {
+  test('uses the canonical start and progress routes and bodies', () async {
     final storage = InMemoryLocalStorage();
     final consent = LocationConsentStore(storage);
     final requests = <HttpRequest>[];
     final client = testClient((request) async {
       requests.add(request);
-      if (request.uri.path.endsWith('/active-journeys')) {
-        return jsonResponse(activeJourneyBody());
+      if (request.method == HttpMethod.post) {
+        return jsonResponse(activeJourneyBody(), statusCode: 201);
       }
-      return jsonResponse({...activeJourneyBody(), 'currentStep': 1});
+      return jsonResponse(activeJourneyBody(currentLegIndex: 1));
     });
     final location = FakeLocationService(
       permission: LocationAccess.granted,
-      position: const GeoCoordinate(latitude: -2.1, longitude: -79.9),
+      position: const GeoCoordinate(latitude: -2.123456, longitude: -79.9),
     );
     final repo = ActiveJourneyRepository(
       client,
       storage,
       FakeConnectivityService(),
-      consent,
       PrivacyAwareLocationReader(location, consent),
     );
     final vm = JourneyViewModel(repo);
 
     await vm.start('plan-1', 'option-1');
-    await vm.updateProgress(const JourneyProgress(stepIndex: 1, sequence: 1));
+    await vm.updateProgress(const JourneyProgress(currentLegIndex: 1));
+
+    final start = requests[0];
+    expect(start.method, HttpMethod.post);
+    expect(start.uri.path, '/v1/journeys/plan-1/options/option-1/start');
+    expect(start.body, isNull);
+    expect(start.headers['Idempotency-Key'], startsWith('journey-start-plan-1-option-1-'));
+
+    final progress = requests[1];
+    expect(progress.method, HttpMethod.patch);
+    expect(progress.uri.path, '/v1/active-journeys/journey-1/progress');
+    final body = progress.body! as Map<String, Object?>;
+    // Exactamente los campos que acepta el API (additionalProperties: false).
+    expect(body.keys.toSet(), {'currentLegIndex', 'occurredAt'});
+    expect(body['currentLegIndex'], 1);
+    expect(DateTime.parse(body['occurredAt']! as String).isUtc, isTrue);
 
     expect(vm.state.journey?.dataState, DataState.degraded);
-    expect(requests.first.body, isA<Map<String, Object?>>());
-    expect((requests.first.body! as Map)['location'], isNull);
-    expect(
-      requests[1].headers['Idempotency-Key'],
-      'journey-progress-journey-1-1',
-    );
+    expect(vm.state.journey?.currentLegIndex, 1);
+    expect(vm.state.journey?.totalLegs, 2);
+    expect(vm.state.journey?.eta, isNull);
     final cache = await storage.read(YeGamoStorageKeys.activeJourney);
-    expect(cache, isNot(contains('-2.1')));
+    expect(cache, isNot(contains('2.123456')));
+  });
+
+  test('sends precise location only with consent and keeps it out of the cache', () async {
+    final storage = InMemoryLocalStorage();
+    final consent = LocationConsentStore(storage);
+    await consent.set(true);
+    final requests = <HttpRequest>[];
+    final client = testClient((request) async {
+      requests.add(request);
+      return jsonResponse(activeJourneyBody());
+    });
+    final repo = ActiveJourneyRepository(
+      client,
+      storage,
+      FakeConnectivityService(),
+      PrivacyAwareLocationReader(
+        FakeLocationService(
+          permission: LocationAccess.granted,
+          position: const GeoCoordinate(latitude: -2.123456, longitude: -79.9),
+        ),
+        consent,
+      ),
+    );
+    final vm = JourneyViewModel(repo);
+    await vm.start('plan-1', 'option-1');
+    await vm.updateProgress(const JourneyProgress(currentLegIndex: 1));
+
+    final body = requests.last.body! as Map<String, Object?>;
+    expect(body['location'], {'lat': -2.123456, 'lon': -79.9});
+    expect(await storage.read(YeGamoStorageKeys.activeJourney), isNot(contains('2.123456')));
+  });
+
+  test('rejects a response that does not satisfy the contract', () async {
+    final storage = InMemoryLocalStorage();
+    final consent = LocationConsentStore(storage);
+    final repo = ActiveJourneyRepository(
+      testClient((_) async => jsonResponse({'id': 'j', 'currentStep': 1})),
+      storage,
+      FakeConnectivityService(),
+      PrivacyAwareLocationReader(FakeLocationService(), consent),
+    );
+    final result = await repo.start('plan-1', 'option-1');
+
+    expect(result.journey, isNull);
+    expect(result.error?.code, 'INVALID_RESPONSE');
+    expect(await storage.read(YeGamoStorageKeys.activeJourney), isNull);
+  });
+
+  test('maps API statuses and never sends UI-only states', () {
+    expect(JourneyStatusParsing.fromApi('COMPLETED'), JourneyStatus.finished);
+    expect(JourneyStatusParsing.fromApi('CANCELLED'), JourneyStatus.canceled);
+    expect(JourneyStatusParsing.fromApi('ABANDONED'), JourneyStatus.canceled);
+    expect(JourneyStatusParsing.fromApi('PLANNED'), JourneyStatus.active);
+    expect(JourneyStatus.getOffAlert.apiValue, 'ACTIVE');
+    expect(JourneyStatus.arrived.apiValue, 'ACTIVE');
   });
 
   test('offline active journey is marked offline cache and does not fake ETA', () async {
@@ -84,7 +174,6 @@ void main() {
       testClient((_) async => jsonResponse(activeJourneyBody())),
       storage,
       FakeConnectivityService(online: false),
-      consent,
       PrivacyAwareLocationReader(FakeLocationService(), consent),
     );
     final vm = JourneyViewModel(repo);
@@ -103,7 +192,6 @@ void main() {
         testClient((_) async => jsonResponse(activeJourneyBody())),
         storage,
         FakeConnectivityService(),
-        consent,
         PrivacyAwareLocationReader(FakeLocationService(), consent),
       ),
     );
@@ -134,10 +222,11 @@ void main() {
       final storage = InMemoryLocalStorage();
       await storage.write('onboarding_completed', 'true');
       final ApiClient client = testClient((request) async {
-        if (request.uri.path.contains('active-journeys')) {
+        if (request.uri.path.contains('active-journeys') ||
+            request.uri.path.endsWith('/start')) {
           final body = request.body;
-          final step = body is Map && body['stepIndex'] is int
-              ? body['stepIndex'] as int
+          final step = body is Map && body['currentLegIndex'] is int
+              ? body['currentLegIndex'] as int
               : 0;
           return jsonResponse(journeyFor(step));
         }
@@ -180,7 +269,7 @@ void main() {
       await pumpJourney(tester, journeyFor: (_) => activeJourneyBody());
 
       expect(find.text('Camina hasta la parada'), findsOneWidget);
-      expect(find.text('Próxima parada: Parada Central'), findsOneWidget);
+      expect(find.text('Paso 1 de 2'), findsOneWidget);
       expect(find.text('DEGRADADO'), findsOneWidget);
       expect(find.text('EN VIVO'), findsNothing);
       // Sin ETA en el viaje no se inventa una hora de llegada.
@@ -191,34 +280,39 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     });
 
-    testWidgets('alerta de bajada muestra la parada y se cierra con Entendido', (tester) async {
+    testWidgets('alerta de bajada es un estado de pantalla y se cierra con Entendido', (tester) async {
       final navigator = await pumpJourney(
         tester,
-        journeyFor: (_) => activeJourneyBody(status: 'GET_OFF_ALERT'),
+        journeyFor: (_) => activeJourneyBody(),
       );
+      tester
+          .element(find.byType(Navigator).first)
+          .read<JourneyViewModel>()
+          .showGetOffAlert();
+      await tester.pump();
       expect(find.byKey(const ValueKey('journey_open_get_off')), findsOneWidget);
 
       navigator.pushNamed(AppRoutes.getOffAlert);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 1800));
 
-      expect(find.text('Parada Central'), findsOneWidget);
+      // Sin nombres de parada en el contrato no se inventa ninguno.
+      expect(find.text('Prepara tu bajada'), findsOneWidget);
       expect(find.text('PRÓXIMA PARADA · BÁJATE'), findsOneWidget);
       await tester.tap(find.text('Entendido'));
       await tester.pump(const Duration(milliseconds: 600));
-      expect(find.text('Parada Central'), findsNothing);
+      expect(find.text('Prepara tu bajada'), findsNothing);
       await tester.pumpWidget(const SizedBox());
       debugDefaultTargetPlatformOverride = null;
     });
 
     testWidgets('llegada es un estado del viaje con acciones', (tester) async {
-      await pumpJourney(
-        tester,
-        journeyFor: (_) => <String, Object?>{
-          ...activeJourneyBody(status: 'ARRIVED'),
-          'currentStep': 2,
-        },
-      );
+      await pumpJourney(tester, journeyFor: (_) => activeJourneyBody());
+      tester
+          .element(find.byType(Navigator).first)
+          .read<JourneyViewModel>()
+          .markArrived();
+      await tester.pump(const Duration(milliseconds: 1500));
 
       expect(find.text('LLEGASTE A TU DESTINO'), findsOneWidget);
       expect(find.byKey(const ValueKey('journey_finish')), findsOneWidget);

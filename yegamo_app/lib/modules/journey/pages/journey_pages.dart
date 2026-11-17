@@ -268,11 +268,9 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
     final leg = legIndex == null ? null : option!.legs[legIndex];
     final legKind = leg == null ? null : legKindOf(leg);
     final instruction =
-        journey.instruction ??
-        (leg != null && leg.instructions.isNotEmpty
+        leg != null && leg.instructions.isNotEmpty
             ? leg.instructions.first
-            : null);
-    final nextStop = journey.nextStop;
+            : journey.instruction;
     final icon = switch (legKind) {
       JourneyLegKind.walk =>
         phase == YgTripPhase.done ? YgIcons.bandera : YgIcons.caminar,
@@ -280,13 +278,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
       JourneyLegKind.ride => YgIcons.bus,
       null => YgIcons.navegar,
     };
-    final showInstruction = instruction != null || nextStop != null;
-    final title = instruction ?? 'Próxima parada: $nextStop';
-    final sub = instruction != null && nextStop != null
-        ? 'Próxima parada: $nextStop'
-        : null;
-    final pre = journey.totalSteps > 0
-        ? 'Paso ${(journey.currentStep + 1).clamp(1, journey.totalSteps)} de ${journey.totalSteps}'
+    final showInstruction = instruction != null;
+    final title = instruction ?? '';
+    const String? sub = null;
+    final pre = journey.totalLegs > 0
+        ? 'Paso ${(journey.currentLegIndex + 1).clamp(1, journey.totalLegs)} de ${journey.totalLegs}'
         : null;
     final message = journeyQualityMessage(vm.state.uxState);
     final view = activeMapView(
@@ -575,13 +571,18 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
   }
 
   Future<void> _updateStep(BuildContext context, ActiveJourney journey) async {
-    final next = journey.currentStep + 1;
-    final status = next >= journey.totalSteps && journey.totalSteps > 0
-        ? JourneyStatus.arrived
-        : JourneyStatus.active;
-    await context.read<JourneyViewModel>().updateProgress(
-      JourneyProgress(stepIndex: next, status: status, sequence: next),
-    );
+    await _advance(context.read<JourneyViewModel>(), journey);
+  }
+
+  /// Avanza un tramo. Pasar del último tramo es solo un estado de pantalla
+  /// (llegada); el API registra la llegada con `finish`, no con `progress`.
+  Future<void> _advance(JourneyViewModel vm, ActiveJourney journey) async {
+    final next = journey.currentLegIndex + 1;
+    if (next >= journey.totalLegs) {
+      vm.markArrived();
+      return;
+    }
+    await vm.updateProgress(JourneyProgress(currentLegIndex: next));
   }
 
   Future<void> _updateWithLocation(
@@ -596,13 +597,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
       vm.showPermissionRequired();
       return;
     }
-    final next = journey.currentStep + 1;
-    final status = next >= journey.totalSteps && journey.totalSteps > 0
-        ? JourneyStatus.arrived
-        : JourneyStatus.active;
-    await vm.updateProgress(
-      JourneyProgress(stepIndex: next, status: status, sequence: next),
-    );
+    await _advance(vm, journey);
   }
 }
 
@@ -665,10 +660,6 @@ class _ActiveSheetBody extends StatelessWidget {
           ),
         );
       }
-    } else if (journey.nextStop != null) {
-      rows.add(
-        JourneyStopRow(title: journey.nextStop!, state: JourneyStopState.next),
-      );
     }
     final visible = showAll ? rows : rows.take(3).toList();
     return SingleChildScrollView(
@@ -705,7 +696,7 @@ class GetOffAlertPage extends StatelessWidget {
     final journey = context.watch<JourneyViewModel>().state.journey;
     final plan = context.watch<PlannerViewModel>().state.plan;
     final option = journey == null ? null : optionFor(plan, journey);
-    final stop = journey?.nextStop ?? 'Prepara tu bajada';
+    const stop = 'Prepara tu bajada';
     // Último tramo a pie del plan y llegada estimada, solo si existen.
     JourneyLeg? lastWalk;
     final legs = option?.legs ?? const <JourneyLeg>[];

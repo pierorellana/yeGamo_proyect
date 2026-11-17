@@ -20,32 +20,51 @@ JourneyLegKind legKindOf(JourneyLeg leg) {
   return JourneyLegKind.ride;
 }
 
-/// Opción del plan que corresponde al viaje activo, si el plan sigue cargado.
+/// Opción que corresponde al viaje activo. Si el plan ya no está cargado (por
+/// ejemplo tras reiniciar la app) se reconstruye con los tramos que el API
+/// devuelve en el propio viaje; nunca se inventan tramos.
 JourneyOption? optionFor(JourneyPlan? plan, ActiveJourney journey) {
-  if (plan == null || plan.planId != journey.planId) return null;
-  for (final option in plan.options) {
-    if (option.id == journey.optionId) return option;
+  if (plan != null && plan.planId == journey.planId) {
+    for (final option in plan.options) {
+      if (option.id == journey.optionId) return option;
+    }
   }
-  return null;
+  if (journey.legs.isEmpty) return null;
+  final walk = journey.legs
+      .where((leg) => legKindOf(leg) == JourneyLegKind.walk)
+      .fold<int>(0, (sum, leg) => sum + leg.durationMin);
+  final rides = journey.legs
+      .where((leg) => legKindOf(leg) == JourneyLegKind.ride)
+      .length;
+  return JourneyOption(
+    id: journey.optionId,
+    durationMin: journey.legs.fold<int>(0, (sum, l) => sum + l.durationMin),
+    walkMin: walk,
+    transfers: rides > 1 ? rides - 1 : 0,
+    reliabilityScore: 0,
+    dataQuality:
+        journey.dataQuality ??
+        JourneyDataQuality(
+          dataState: journey.dataState,
+          liveVehicle: false,
+          sourceAuthorized: false,
+        ),
+    legs: journey.legs,
+  );
 }
 
-/// Tramo en curso derivado del progreso real (paso actual / pasos totales).
+/// Tramo en curso según el progreso persistido (`currentLegIndex`).
 int? currentLegIndex(ActiveJourney journey, JourneyOption? option) {
   final legs = option?.legs ?? const <JourneyLeg>[];
-  if (legs.isEmpty || journey.totalSteps <= 0) return null;
-  if (journey.currentStep >= journey.totalSteps) return legs.length - 1;
-  final index = (journey.currentStep / journey.totalSteps * legs.length).floor();
-  return index.clamp(0, legs.length - 1).toInt();
+  if (legs.isEmpty) return null;
+  return journey.currentLegIndex.clamp(0, legs.length - 1).toInt();
 }
 
 /// Fase del viaje para el mapa; `null` si el plan no trae tramos.
 YgTripPhase? tripPhaseFor(ActiveJourney journey, JourneyOption? option) {
   final index = currentLegIndex(journey, option);
   if (index == null || option == null) return null;
-  if (journey.status == JourneyStatus.arrived ||
-      journey.currentStep >= journey.totalSteps) {
-    return YgTripPhase.done;
-  }
+  if (journey.status == JourneyStatus.arrived) return YgTripPhase.done;
   final legs = option.legs;
   return switch (legKindOf(legs[index])) {
     JourneyLegKind.wait => YgTripPhase.wait,
@@ -76,9 +95,11 @@ YgMapView activeMapView({
   required double visibleBottom,
 }) {
   final phase = tripPhaseFor(journey, option);
-  final progress = journey.totalSteps <= 0
+  final progress = journey.totalLegs <= 0
       ? 0.0
-      : (journey.currentStep / journey.totalSteps).clamp(0.0, 1.0).toDouble();
+      : (journey.currentLegIndex / journey.totalLegs)
+            .clamp(0.0, 1.0)
+            .toDouble();
   return YgMapView(
     mode: YgMapMode.active,
     phase: phase ?? const YgMapView().phase,
