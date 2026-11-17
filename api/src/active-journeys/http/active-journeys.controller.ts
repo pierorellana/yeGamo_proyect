@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Param, Patch, Post, Req, UseGuards, Get } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Param, Patch, Post, Req, UseGuards, Get } from '@nestjs/common';
 import { AuthenticatedRequest, principalOf, PrincipalAuthGuard } from '../../identity/http/auth.guard';
 import { ActiveJourneysService } from '../application/active-journeys.service';
 import { ActiveJourneyIdDto, ActiveJourneyStartParamsDto, JourneyProgressDto } from './active-journeys.dto';
@@ -18,8 +18,10 @@ export class ActiveJourneysController {
   progress(@Req() request: AuthenticatedRequest, @Param() params: ActiveJourneyIdDto, @Body() body: JourneyProgressDto, @Headers('idempotency-key') key: string | undefined) { return this.journeys.progress(principalOf(request).userId, params.id, body, key); }
 
   @Post('active-journeys/:id/finish')
+  @HttpCode(HttpStatus.OK)
   finish(@Req() request: AuthenticatedRequest, @Param() params: ActiveJourneyIdDto, @Headers('idempotency-key') key: string | undefined) { return this.journeys.finish(principalOf(request).userId, params.id, key); }
 
   @Post('active-journeys/:id/cancel')
+  @HttpCode(HttpStatus.OK)
   cancel(@Req() request: AuthenticatedRequest, @Param() params: ActiveJourneyIdDto, @Headers('idempotency-key') key: string | undefined) { return this.journeys.cancel(principalOf(request).userId, params.id, key); }
 }
