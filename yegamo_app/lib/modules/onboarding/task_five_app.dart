@@ -10,6 +10,7 @@ import '../../shared/location/location_service.dart';
 import '../../shared/navigation/app_navigator.dart';
 import '../../shared/navigation/app_routes.dart';
 import '../../shared/services/api_client.dart';
+import '../../shared/session/token_store.dart';
 import '../../shared/services/connectivity_service.dart';
 import '../../shared/storage/local_storage.dart';
 import '../../shared/session/session_service.dart';
@@ -70,12 +71,18 @@ class TaskFiveScope extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final storage = localStorage ?? InMemoryLocalStorage();
+    final tokenStore = TokenStore(
+      storage,
+      refresher: config.oidcConfigured
+          ? OidcTokenRefresher(
+              tokenEndpoint: Uri.parse(config.oidcTokenEndpoint),
+              clientId: config.oidcClientId,
+            )
+          : null,
+    );
     final client =
         apiClient ??
-        ApiClient(
-          config: config,
-          tokenProvider: () => storage.readSecure('access_token'),
-        );
+        ApiClient(config: config, tokenProvider: tokenStore.validAccessToken);
     final connectivity = connectivityService ?? DeviceConnectivityService();
     final location = locationService ?? const GeolocatorLocationService();
     final consentStore = LocationConsentStore(storage);
@@ -86,11 +93,12 @@ class TaskFiveScope extends StatelessWidget {
         Provider<AppConfig>.value(value: config),
         Provider<ApiClient>.value(value: client),
         Provider<LocalStorage>.value(value: storage),
+        Provider<TokenStore>.value(value: tokenStore),
         Provider<ConnectivityService>.value(value: connectivity),
         Provider<LocationService>.value(value: location),
         Provider<LocationConsentStore>.value(value: consentStore),
         ChangeNotifierProvider<SessionManager>(
-          create: (_) => SessionManager(storage)..initialize(),
+          create: (_) => SessionManager(storage, tokens: tokenStore)..initialize(),
         ),
         ChangeNotifierProvider<AppShellController>(
           create: (_) => AppShellController(),

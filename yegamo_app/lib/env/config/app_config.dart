@@ -14,6 +14,8 @@ class AppConfig {
     this.realMapEnabled = false,
     this.mapStyleUrl = '',
     this.mapTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    this.oidcTokenEndpoint = '',
+    this.oidcClientId = '',
     this.requestTimeout = const Duration(seconds: 15),
     this.maxRetries = 1,
   });
@@ -48,6 +50,9 @@ class AppConfig {
       defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     );
 
+    const oidcTokenEndpoint = String.fromEnvironment('YEGAMO_OIDC_TOKEN_ENDPOINT');
+    const oidcClientId = String.fromEnvironment('YEGAMO_OIDC_CLIENT_ID');
+
     final environment = AppEnvironment.values.firstWhere(
       (value) => value.name == rawEnvironment,
       orElse: () => AppEnvironment.development,
@@ -62,6 +67,8 @@ class AppConfig {
       realMapEnabled: realMapEnabled,
       mapStyleUrl: mapStyleUrl,
       mapTileUrl: mapTileUrl,
+      oidcTokenEndpoint: oidcTokenEndpoint,
+      oidcClientId: oidcClientId,
     );
   }
 
@@ -72,8 +79,14 @@ class AppConfig {
   final bool realMapEnabled;
   final String mapStyleUrl;
   final String mapTileUrl;
+  /// Proveedor OIDC (público, sin secretos). Vacío = el inicio de sesión no está
+  /// configurado en este build y la app permanece en modo invitado.
+  final String oidcTokenEndpoint;
+  final String oidcClientId;
   final Duration requestTimeout;
   final int maxRetries;
+
+  bool get oidcConfigured => oidcTokenEndpoint.isNotEmpty && oidcClientId.isNotEmpty;
 
   bool get isProduction => environment == AppEnvironment.production;
 
