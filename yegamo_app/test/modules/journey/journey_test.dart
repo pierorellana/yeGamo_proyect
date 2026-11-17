@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -219,6 +220,72 @@ void main() {
     final result = await repo.start('plan-1', 'opt-1');
     expect(result.journey, isNull);
     expect(result.error?.code, 'AUTH_REQUIRED');
+  });
+
+  test('restore: local journeys come back, stale API journeys are discarded', () async {
+    final storage = InMemoryLocalStorage();
+    final consent = LocationConsentStore(storage);
+    // Un viaje local persistido.
+    final guestRepo = ActiveJourneyRepository(
+      testClient((_) async => jsonResponse(activeJourneyBody())),
+      storage,
+      FakeConnectivityService(),
+      PrivacyAwareLocationReader(FakeLocationService(), consent),
+      SessionManager(storage),
+    );
+    final option = JourneyOption.fromJson({
+      'id': 'opt-1',
+      'durationMin': 10,
+      'walkMin': 10,
+      'transfers': 0,
+      'reliability': {'score': null, 'level': null, 'sampleSize': null},
+      'dataQuality': {'dataState': 'DEGRADED', 'liveVehicle': false, 'sourceAuthorized': false},
+      'legs': [_leg('WALK', 'Uno'), _leg('WALK', 'Dos')],
+    });
+    await guestRepo.start('plan-1', 'opt-1', option: option);
+    await guestRepo.updateProgress(const JourneyProgress(currentLegIndex: 1));
+
+    final restored = await guestRepo.restore();
+    expect(restored?.journey?.currentLegIndex, 1);
+
+    // Un viaje de cuenta: el API lo refresca; si responde 404 se descarta.
+    final signedIn = await _signedIn(storage);
+    await storage.write(
+      YeGamoStorageKeys.activeJourney,
+      jsonEncode(ActiveJourney.fromJson(activeJourneyBody()).toJson()),
+    );
+    var status = 200;
+    final accountRepo = ActiveJourneyRepository(
+      testClient((request) async => status == 200
+          ? jsonResponse(activeJourneyBody(currentLegIndex: 1))
+          : jsonResponse({'code': 'NOT_FOUND', 'message': 'x'}, statusCode: 404)),
+      storage,
+      FakeConnectivityService(),
+      PrivacyAwareLocationReader(FakeLocationService(), consent),
+      signedIn,
+    );
+    expect((await accountRepo.restore())?.journey?.currentLegIndex, 1);
+    status = 404;
+    expect(await accountRepo.restore(), isNull);
+    expect(await storage.read(YeGamoStorageKeys.activeJourney), isNull);
+  });
+
+  test('restore offline shows the saved journey as OFFLINE_CACHE, never current', () async {
+    final storage = InMemoryLocalStorage();
+    final consent = LocationConsentStore(storage);
+    await storage.write(
+      YeGamoStorageKeys.activeJourney,
+      jsonEncode(ActiveJourney.fromJson(activeJourneyBody()).toJson()),
+    );
+    final repo = ActiveJourneyRepository(
+      testClient((_) async => jsonResponse(activeJourneyBody())),
+      storage,
+      FakeConnectivityService(online: false),
+      PrivacyAwareLocationReader(FakeLocationService(), consent),
+      await _signedIn(storage),
+    );
+    final result = await repo.restore();
+    expect(result?.journey?.dataState, DataState.offlineCache);
   });
 
   test('maps API statuses and never sends UI-only states', () {

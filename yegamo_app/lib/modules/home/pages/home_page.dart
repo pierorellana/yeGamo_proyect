@@ -9,6 +9,7 @@ import '../../../shared/map/yg_map_view.dart';
 import '../../../shared/models/data_state.dart';
 import '../../../shared/navigation/app_navigator.dart';
 import '../../../shared/navigation/app_routes.dart';
+import '../../journey/providers/journey_view_model.dart';
 import '../../nearby/providers/nearby_view_model.dart';
 import '../../notifications/providers/notifications_view_model.dart';
 import '../../saved/providers/saved_view_model.dart';
@@ -57,6 +58,8 @@ class _HomePageState extends State<HomePage> {
     final nearby = context.read<NearbyViewModel>();
     final location = context.read<LocationService>();
     home.load();
+    // Retoma un viaje en curso (local o de cuenta) tras cerrar o reiniciar la app.
+    context.read<JourneyViewModel>().restore();
     if (saved.state.items.isEmpty && !saved.loading) saved.load();
     final access = await location.checkPermission();
     if (!mounted) return;
@@ -93,6 +96,10 @@ class _HomePageState extends State<HomePage> {
       (s) => s.state.items.map((p) => p.label).toList(growable: false),
     );
     final nearby = context.watch<NearbyViewModel>().snapshot;
+    final journeyState = context.watch<JourneyViewModel>().state.journey;
+    final activeJourney = journeyState != null && !journeyState.isTerminal
+        ? journeyState
+        : null;
 
     final located =
         _access != null &&
@@ -128,6 +135,22 @@ class _HomePageState extends State<HomePage> {
               onNotices: () => context.read<AppShellController>().selectTab(3),
               onSettings: () => _push(AppRoutes.settings),
             ),
+            if (activeJourney != null && state != UxState.offline)
+              Positioned(
+                top: YgSize.floatY,
+                left: 16,
+                right: 16,
+                child: YgBanner(
+                  floating: true,
+                  title: 'Viaje en curso',
+                  message: activeJourney.dataState == DataState.offlineCache
+                      ? 'Sin conexión: mostrando tu último estado guardado'
+                      : 'Paso ${(activeJourney.currentLegIndex + 1).clamp(1, activeJourney.totalLegs == 0 ? 1 : activeJourney.totalLegs)} de ${activeJourney.totalLegs}',
+                  icon: YgIcons.navegar,
+                  actionLabel: 'Continuar',
+                  onAction: () => _push(AppRoutes.activeJourney),
+                ),
+              ),
             if (state == UxState.offline)
               Positioned(
                 top: YgSize.floatY,

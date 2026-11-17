@@ -23,6 +23,20 @@ class JourneyViewModel extends ChangeNotifier {
     await _run(() => _repository.start(planId, optionId, option: option));
   }
 
+  /// Recupera un viaje en curso al abrir la app; no hace nada si no hay uno.
+  Future<void> restore() async {
+    if (_loading || _state.journey != null) return;
+    _loading = true;
+    final result = await _repository.restore();
+    _loading = false;
+    if (result == null) return;
+    final journey = result.journey;
+    if (journey != null) {
+      _state = JourneyState(journey: journey, uxState: _stateFor(journey));
+      notifyListeners();
+    }
+  }
+
   Future<void> updateProgress(JourneyProgress progress) async {
     await _run(() => _repository.updateProgress(progress));
   }

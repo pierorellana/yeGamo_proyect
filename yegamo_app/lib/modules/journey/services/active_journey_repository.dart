@@ -77,6 +77,37 @@ class ActiveJourneyRepository {
   static bool isLocal(ActiveJourney journey) =>
       journey.id.startsWith(localIdPrefix);
 
+  /// Recupera el viaje tras cerrar/reiniciar la app. Un viaje local (invitado) se
+  /// restaura tal cual; uno de cuenta se refresca desde el API. Si el API ya no
+  /// lo conoce o terminó, se descarta la caché; sin red se muestra la caché marcada
+  /// como `OFFLINE_CACHE` (nunca como actual).
+  Future<ActiveJourneyResult?> restore() async {
+    final cached = await _readCache();
+    if (cached == null || cached.isTerminal) {
+      if (cached != null) await _storage.remove(cacheKey);
+      return null;
+    }
+    if (isLocal(cached)) return ActiveJourneyResult(journey: cached);
+    if (!_session.isAuthenticated) {
+      // El viaje pertenecía a una cuenta cuya sesión ya no existe.
+      await _storage.remove(cacheKey);
+      return null;
+    }
+    if (!await _connectivity.isOnline) return _offlineResult(cached: cached);
+    final response = await _apiClient.get<Object?>('active-journeys/${cached.id}');
+    if (response.error?.statusCode == 404) {
+      await _storage.remove(cacheKey);
+      return null;
+    }
+    if (!response.isSuccess) return _offlineResult(cached: cached);
+    final result = await _map(response, fallback: cached);
+    if (result.journey?.isTerminal == true) {
+      await _storage.remove(cacheKey);
+      return null;
+    }
+    return result;
+  }
+
   Future<ActiveJourneyResult> updateProgress(JourneyProgress progress) async {
     final cached = await _readCache();
     if (cached == null) {

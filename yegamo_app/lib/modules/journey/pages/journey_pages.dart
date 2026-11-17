@@ -13,6 +13,7 @@ import '../../../shared/widgets/remote_state_view.dart';
 import '../../planner/models/planner_models.dart';
 import '../../planner/providers/planner_view_model.dart';
 import '../models/journey_models.dart';
+import '../services/leg_progress_advisor.dart';
 import '../providers/journey_view_model.dart';
 import '../widgets/active_journey_widgets.dart';
 import '../widgets/arrival_widgets.dart';
@@ -365,7 +366,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
                             icon: YgIcons.navegar,
                             onTap: vm.loading
                                 ? null
-                                : () => _updateWithLocation(context, journey),
+                                : () => _updateWithLocation(journey),
                           ),
                         ],
                       ),
@@ -592,11 +593,12 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
     await vm.updateProgress(JourneyProgress(currentLegIndex: next));
   }
 
-  Future<void> _updateWithLocation(
-    BuildContext context,
-    ActiveJourney journey,
-  ) async {
+  /// Avanza solo con evidencia: lee la ubicación (con consentimiento), la compara
+  /// con el final del tramo y, si no hay prueba suficiente, explica por qué y deja
+  /// el avance manual («Siguiente paso»).
+  Future<void> _updateWithLocation(ActiveJourney journey) async {
     final consentStore = context.read<LocationConsentStore>();
+    final locationService = context.read<LocationService>();
     final vm = context.read<JourneyViewModel>();
     final consent = await consentStore.read();
     if (!mounted) return;
@@ -604,7 +606,36 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
       vm.showPermissionRequired();
       return;
     }
-    await _advance(vm, journey);
+    final position = await locationService.currentPosition();
+    if (!mounted) return;
+    final leg = journey.currentLeg;
+    if (position == null || leg == null) {
+      YgToast.show(
+        context,
+        'No pudimos obtener tu ubicación. Usa «Siguiente paso» cuando llegues.',
+      );
+      return;
+    }
+    final assessment = const LegProgressAdvisor().assess(position, leg);
+    switch (assessment.advice) {
+      case LegAdvice.nearEnd:
+        await _advance(vm, journey);
+      case LegAdvice.offRoute:
+        YgToast.show(
+          context,
+          'Parece que te alejaste del recorrido a pie (${assessment.offRouteM!.round()} m). Revisa el paso a paso.',
+        );
+      case LegAdvice.onTrack:
+        YgToast.show(
+          context,
+          'Aún estás a ${assessment.distanceToEndM!.round()} m del final de este tramo. Si ya llegaste, usa «Siguiente paso».',
+        );
+      case LegAdvice.unknown:
+        YgToast.show(
+          context,
+          'Este tramo no trae coordenadas: confirma tú el avance con «Siguiente paso».',
+        );
+    }
   }
 }
 
