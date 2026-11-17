@@ -26,7 +26,7 @@ class CommutesViewModel extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     final result = await _repository.save(routine);
-    _state = CommutesState(items: result.items, message: result.error?.message);
+    _state = CommutesState(items: result.items, message: result.error?.message ?? result.notice);
     _loading = false;
     notifyListeners();
   }
@@ -35,7 +35,7 @@ class CommutesViewModel extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     final result = await _repository.setPaused(routine, !routine.isPaused);
-    _state = CommutesState(items: result.items, message: result.error?.message);
+    _state = CommutesState(items: result.items, message: result.error?.message ?? result.notice);
     _loading = false;
     notifyListeners();
   }
@@ -44,7 +44,7 @@ class CommutesViewModel extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     final result = await _repository.remove(id);
-    _state = CommutesState(items: result.items, message: result.error?.message);
+    _state = CommutesState(items: result.items, message: result.error?.message ?? result.notice);
     _loading = false;
     notifyListeners();
   }

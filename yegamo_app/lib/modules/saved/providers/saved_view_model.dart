@@ -26,7 +26,7 @@ class SavedViewModel extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     final result = await _repository.add(place);
-    _state = SavedPlacesState(items: result.items, message: result.error?.message);
+    _state = SavedPlacesState(items: result.items, message: result.error?.message ?? result.notice);
     _loading = false;
     notifyListeners();
   }
@@ -35,7 +35,7 @@ class SavedViewModel extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     final result = await _repository.remove(id);
-    _state = SavedPlacesState(items: result.items, message: result.error?.message);
+    _state = SavedPlacesState(items: result.items, message: result.error?.message ?? result.notice);
     _loading = false;
     notifyListeners();
   }

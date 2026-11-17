@@ -13,6 +13,8 @@ class SavedPlacesRepository {
   final ApiClient _apiClient;
   final SessionManager _session;
 
+  /// Con sesión: lugares del servidor más los que solo existen en este
+  /// dispositivo (sin coordenadas o aún sin sincronizar). Sin red conserva lo local.
   Future<List<SavedPlace>> list() async {
     final local = await _readLocal();
     if (!_session.isAuthenticated) return local;
@@ -22,8 +24,17 @@ class SavedPlacesRepository {
           .whereType<Map>()
           .map((value) => SavedPlace.fromJson(Map<String, Object?>.from(value)))
           .toList(growable: false);
-      await _writeLocal(remote);
-      return remote;
+      final remoteIds = remote.map((item) => item.id).toSet();
+      final merged = <SavedPlace>[
+        ...remote,
+        ...local.where((item) => !item.isRemote || !remoteIds.contains(item.id)),
+      ];
+      // Un lugar remoto que ya no existe en el servidor se descarta.
+      final pruned = merged
+          .where((item) => !item.isRemote || remoteIds.contains(item.id))
+          .toList(growable: false);
+      await _writeLocal(pruned);
+      return pruned;
     }
     return local;
   }
@@ -31,29 +42,57 @@ class SavedPlacesRepository {
   Future<SavedOperationResult> add(SavedPlace place) async {
     final current = await _readLocal();
     final withoutDuplicate = current.where((item) => item.id != place.id).toList();
-    await _writeLocal(<SavedPlace>[...withoutDuplicate, place]);
-    if (_session.isAuthenticated) {
-      final response = await _apiClient.post<Object?>(
-        'favorites/places',
-        body: place.toJson(),
-        idempotencyKey: 'favorite-${place.id}',
-      );
-      if (!response.isSuccess && response.error?.statusCode != 409) {
-        return SavedOperationResult(items: await _readLocal(), error: response.error);
-      }
+    if (!_session.isAuthenticated) {
+      await _writeLocal([...withoutDuplicate, place]);
+      return SavedOperationResult(items: await _readLocal());
     }
-    return SavedOperationResult(items: await _readLocal());
+    if (!place.hasLocation) {
+      await _writeLocal([...withoutDuplicate, place]);
+      return SavedOperationResult(
+        items: await _readLocal(),
+        notice:
+            'Guardado solo en este dispositivo: falta la ubicación para sincronizarlo.',
+      );
+    }
+    final response = await _apiClient.post<Object?>(
+      'favorites/places',
+      body: place.toApiJson(),
+      idempotencyKey: 'favorite-${place.id}',
+    );
+    if (response.isSuccess && response.data is Map) {
+      final saved = SavedPlace.fromJson(
+        Map<String, Object?>.from(response.data! as Map),
+      );
+      await _writeLocal([
+        ...withoutDuplicate,
+        SavedPlace(
+          id: saved.id,
+          label: saved.label,
+          subtitle: place.subtitle,
+          latitude: saved.latitude ?? place.latitude,
+          longitude: saved.longitude ?? place.longitude,
+        ),
+      ]);
+      return SavedOperationResult(items: await _readLocal());
+    }
+    // Sin sincronizar: queda local y visible para reintentar en la próxima carga.
+    await _writeLocal([...withoutDuplicate, place]);
+    return SavedOperationResult(items: await _readLocal(), error: response.error);
   }
 
   Future<SavedOperationResult> remove(String id) async {
     final current = await _readLocal();
-    await _writeLocal(current.where((item) => item.id != id).toList());
-    if (_session.isAuthenticated) {
-      final response = await _apiClient.delete<Object?>('favorites/places/$id');
+    final target = current.where((item) => item.id == id).firstOrNull;
+    if (_session.isAuthenticated && (target?.isRemote ?? false)) {
+      final response = await _apiClient.delete<Object?>(
+        'favorites/places/$id',
+        idempotencyKey: 'favorite-delete-$id',
+      );
       if (!response.isSuccess && response.error?.statusCode != 404) {
-        return SavedOperationResult(items: await _readLocal(), error: response.error);
+        return SavedOperationResult(items: current, error: response.error);
       }
     }
+    await _writeLocal(current.where((item) => item.id != id).toList());
     return SavedOperationResult(items: await _readLocal());
   }
 
@@ -81,8 +120,11 @@ class SavedPlacesRepository {
 }
 
 class SavedOperationResult {
-  const SavedOperationResult({required this.items, this.error});
+  const SavedOperationResult({required this.items, this.error, this.notice});
 
   final List<SavedPlace> items;
   final ApiError? error;
+
+  /// Aviso no fatal (p. ej. «solo en este dispositivo»).
+  final String? notice;
 }

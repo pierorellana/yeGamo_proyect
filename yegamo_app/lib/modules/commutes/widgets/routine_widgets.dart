@@ -293,6 +293,12 @@ class _RoutineEditorState extends State<_RoutineEditor> {
           timeZoneName: base?.timeZoneName ?? now.timeZoneName,
           timeZoneOffsetMinutes:
               base?.timeZoneOffsetMinutes ?? now.timeZoneOffset.inMinutes,
+          // Coordenadas solo si se escribieron como «lat, lon»: nunca se inventan.
+          originPoint:
+              base?.originPoint ?? CommuteRoutine.parsePoint(_origin.text),
+          destinationPoint:
+              base?.destinationPoint ??
+              CommuteRoutine.parsePoint(_destination.text),
         ),
       ),
     );

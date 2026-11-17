@@ -26,6 +26,32 @@ class SavedPlace {
     );
   }
 
+  static final _uuid = RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  );
+
+  /// Coordenadas válidas: requisito para sincronizar con la cuenta.
+  bool get hasLocation =>
+      latitude != null &&
+      longitude != null &&
+      latitude!.abs() <= 90 &&
+      longitude!.abs() <= 180;
+
+  /// El id lo asignó el API (UUID); los ids locales nunca se envían al servidor.
+  bool get isRemote => _uuid.hasMatch(id);
+
+  /// Cuerpo de `POST/PATCH /v1/favorites/places`: solo `label` y `location`
+  /// (el API rechaza campos desconocidos). Requiere [hasLocation].
+  Map<String, Object?> toApiJson() {
+    assert(hasLocation, 'Un lugar sin coordenadas no puede sincronizarse.');
+    return {
+      'label': label,
+      'location': {'lat': latitude, 'lon': longitude},
+    };
+  }
+
+  /// Serialización de almacenamiento local.
   Map<String, Object?> toJson() => {
     'id': id,
     'label': label,
