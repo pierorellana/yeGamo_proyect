@@ -11,9 +11,11 @@ contra la solicitud de las diez fases. Decisiones: [ADR-010](../adr/ADR-010-guay
 | API unitarias/contrato | `npm test` | 16 suites · 63 pruebas OK |
 | API contra PostgreSQL 18 + PostGIS 3.6 | `DATABASE_URL=… npm run test:e2e` | 8 suites · 25 pruebas OK (migraciones 0001–0011, persistencia de plan tras «reinicio», plan→start→progress→finish por HTTP real con JWT RS256 firmado localmente, migración guest, preferencias, alertas, scheduler) |
 | Flutter | `flutter analyze` / `flutter test` | sin issues · 179 pruebas OK |
-| Android release | `flutter build apk --release` | ver «Estado de producción» |
+| Android release | `flutter build apk --release` | Compila (APK 87,7 MB). `aapt` confirma `INTERNET`/`ACCESS_NETWORK_STATE`; `apksigner` lo da por **no firmado** (sin `key.properties`, intencional). No se instaló ni se probó en un dispositivo. |
 
 ## No verificado
+
+- Nota de build: un `GeneratedPluginRegistrant.java` regenerado con dependencias de desarrollo hizo fallar el primer build release (`integration_test` no existe en release). Se resolvió borrándolo y dejando que el build lo regenere; es un archivo generado e ignorado por git.
 
 - `integration_test/*` (necesitan dispositivo/simulador; el arranque falló sin dispositivo). Se actualizaron al contrato nuevo pero **no se ejecutaron**.
 - Dispositivo físico (Android/iOS), permisos reales en segundo plano, build iOS release.
