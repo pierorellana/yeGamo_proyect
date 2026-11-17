@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../shared/design_system/yg_components.dart';
+import '../../notifications/services/alerts_repository.dart';
 import '../../../shared/map/yg_map_view.dart';
 import '../../../shared/models/data_state.dart';
 import '../../../shared/navigation/app_routes.dart';
@@ -209,6 +210,8 @@ class _DeparturePageState extends State<DeparturePage> {
                 target: target,
               ),
             ),
+          if (plan != null && dep != null)
+            _LeaveAlertButton(planId: plan.planId, leaveAt: dep),
           if (option != null) ..._composition(option, vm.extraSafetyMarginMin),
           if (option != null) _reliability(option, vm.extraSafetyMarginMin),
         ],
@@ -825,4 +828,67 @@ class _HatchPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _HatchPainter old) => old.small != small;
+}
+
+
+/// «Avisarme» / «Cancelar aviso». Solo aparece con una hora de salida real del
+/// plan; programa `POST /v1/alerts/leave` y cancela con `DELETE /v1/alerts/{id}`.
+class _LeaveAlertButton extends StatefulWidget {
+  const _LeaveAlertButton({required this.planId, required this.leaveAt});
+
+  final String planId;
+  final DateTime leaveAt;
+
+  @override
+  State<_LeaveAlertButton> createState() => _LeaveAlertButtonState();
+}
+
+class _LeaveAlertButtonState extends State<_LeaveAlertButton> {
+  DateTime? _scheduled;
+  bool _busy = false;
+  bool _loaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loaded) return;
+    _loaded = true;
+    context.read<AlertsRepository>().scheduledFor(widget.planId).then((value) {
+      if (mounted) setState(() => _scheduled = value);
+    });
+  }
+
+  Future<void> _toggle() async {
+    final repo = context.read<AlertsRepository>();
+    setState(() => _busy = true);
+    final scheduled = _scheduled != null;
+    final result = scheduled
+        ? await repo.cancel(widget.planId)
+        : await repo.schedule(planId: widget.planId, leaveAt: widget.leaveAt);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (result.ok) _scheduled = scheduled ? null : result.scheduledFor;
+    });
+    YgToast.show(
+      context,
+      result.error?.message ??
+          (scheduled ? 'Aviso cancelado' : 'Te avisaremos a la hora de salir'),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: YgButton(
+        key: const ValueKey('departure_alert'),
+        label: _scheduled == null ? 'Avisarme' : 'Cancelar aviso',
+        icon: YgIcons.campana,
+        variant: YgButtonVariant.secondary,
+        expand: true,
+        onPressed: _busy ? null : _toggle,
+      ),
+    );
+  }
 }

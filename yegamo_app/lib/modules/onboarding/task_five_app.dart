@@ -11,6 +11,7 @@ import '../../shared/navigation/app_navigator.dart';
 import '../../shared/navigation/app_routes.dart';
 import '../../shared/services/api_client.dart';
 import '../../shared/session/token_store.dart';
+import '../notifications/services/alerts_repository.dart';
 import '../../shared/services/connectivity_service.dart';
 import '../../shared/storage/local_storage.dart';
 import '../../shared/session/session_service.dart';
@@ -99,6 +100,10 @@ class TaskFiveScope extends StatelessWidget {
         Provider<LocationConsentStore>.value(value: consentStore),
         ChangeNotifierProvider<SessionManager>(
           create: (_) => SessionManager(storage, tokens: tokenStore)..initialize(),
+        ),
+        ProxyProvider<SessionManager, AlertsRepository>(
+          update: (context, session, _) =>
+              AlertsRepository(storage, client, session),
         ),
         ChangeNotifierProvider<AppShellController>(
           create: (_) => AppShellController(),
