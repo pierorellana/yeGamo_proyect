@@ -23,17 +23,3 @@ class DeviceConnectivityService implements ConnectivityService {
   static bool _isOnline(List<ConnectivityResult> results) =>
       results.any((result) => result != ConnectivityResult.none);
 }
-
-class FakeConnectivityService implements ConnectivityService {
-  FakeConnectivityService({this.online = true});
-
-  bool online;
-
-  @override
-  Future<bool> get isOnline async => online;
-
-  @override
-  Stream<bool> get onStatusChanged => const Stream<bool>.empty();
-
-  void setOnline(bool value) => online = value;
-}

@@ -5,9 +5,9 @@ import 'package:yegamo_app/modules/nearby/models/nearby_models.dart';
 import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/models/data_state.dart';
 import 'package:yegamo_app/shared/services/api_client.dart';
-import 'package:yegamo_app/shared/services/connectivity_service.dart';
 
 import '../test_support.dart';
+import '../../support/fakes.dart';
 
 void main() {
   test('parses source metadata from an OSM nearby stop', () {

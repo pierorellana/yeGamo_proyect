@@ -3,12 +3,12 @@ import 'package:yegamo_app/env/config/app_config.dart';
 import 'package:yegamo_app/modules/home/services/home_repository.dart';
 import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/models/data_state.dart';
-import 'package:yegamo_app/shared/services/connectivity_service.dart';
 import 'package:yegamo_app/shared/services/api_client.dart';
 import 'package:yegamo_app/shared/session/session_service.dart';
 import 'package:yegamo_app/shared/storage/local_storage.dart';
 
 import '../test_support.dart';
+import '../../support/fakes.dart';
 
 void main() {
   test(

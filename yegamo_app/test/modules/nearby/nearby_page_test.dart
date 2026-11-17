@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yegamo_app/main.dart';
 import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/navigation/app_routes.dart';
-import 'package:yegamo_app/shared/services/connectivity_service.dart';
 import 'package:yegamo_app/shared/storage/local_storage.dart';
 
 import '../test_support.dart';
+import '../../support/fakes.dart';
 
 Future<void> _openNearby(
   WidgetTester tester, {

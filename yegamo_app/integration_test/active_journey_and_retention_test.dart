@@ -8,11 +8,11 @@ import 'package:yegamo_app/modules/planner/pages/planner_pages.dart';
 import 'package:yegamo_app/modules/onboarding/task_five_app.dart';
 import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/navigation/app_routes.dart';
-import 'package:yegamo_app/shared/services/connectivity_service.dart';
 import 'package:yegamo_app/shared/storage/local_storage.dart';
 
 import '../test/modules/journey/journey_test.dart' show activeJourneyBody;
 import '../test/modules/test_support.dart';
+import '../test/support/fakes.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

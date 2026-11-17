@@ -4,6 +4,7 @@ import 'package:yegamo_app/modules/permissions/providers/permission_view_model.d
 import 'package:yegamo_app/modules/permissions/services/permission_repository.dart';
 import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/storage/local_storage.dart';
+import '../../support/fakes.dart';
 
 void main() {
   test(

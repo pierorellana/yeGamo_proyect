@@ -6,13 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yegamo_app/main.dart';
 import 'package:yegamo_app/modules/planner/pages/planner_pages.dart';
 import 'package:yegamo_app/shared/design_system/yg_components.dart';
-import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/navigation/app_routes.dart';
 import 'package:yegamo_app/shared/services/api_client.dart';
-import 'package:yegamo_app/shared/services/connectivity_service.dart';
 import 'package:yegamo_app/shared/storage/local_storage.dart';
 
 import '../test_support.dart';
+import '../../support/fakes.dart';
 
 Map<String, Object?> _planWithTimes({bool live = false}) {
   final base = validPlanBody();

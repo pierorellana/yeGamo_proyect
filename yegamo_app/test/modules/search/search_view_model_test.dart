@@ -4,10 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yegamo_app/modules/search/providers/search_view_model.dart';
 import 'package:yegamo_app/modules/search/services/search_repository.dart';
 import 'package:yegamo_app/shared/services/api_client.dart';
-import 'package:yegamo_app/shared/services/connectivity_service.dart';
 import 'package:yegamo_app/shared/storage/local_storage.dart';
 
 import '../test_support.dart';
+import '../../support/fakes.dart';
 
 void main() {
   test('ignores a result from an older search request', () async {

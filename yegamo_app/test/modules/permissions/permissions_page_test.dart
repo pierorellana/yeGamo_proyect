@@ -7,8 +7,8 @@ import 'package:yegamo_app/env/config/app_config.dart';
 import 'package:yegamo_app/modules/onboarding/task_five_app.dart';
 import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/navigation/app_routes.dart';
-import 'package:yegamo_app/shared/services/connectivity_service.dart';
 import 'package:yegamo_app/shared/storage/local_storage.dart';
+import '../../support/fakes.dart';
 
 Future<void> _loadGeist() async {
   final geist = FontLoader('Geist');

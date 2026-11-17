@@ -101,20 +101,3 @@ class GeolocatorLocationService implements LocationService {
         LocationPermission.unableToDetermine => LocationAccess.restricted,
       };
 }
-
-class FakeLocationService implements LocationService {
-  FakeLocationService({this.permission = LocationAccess.denied, this.position});
-
-  LocationAccess permission;
-  GeoCoordinate? position;
-
-  @override
-  Future<LocationAccess> checkPermission() async => permission;
-
-  @override
-  Future<LocationAccess> requestWhileInUse() async => permission;
-
-  @override
-  Future<GeoCoordinate?> currentPosition() async =>
-      permission == LocationAccess.granted ? position : null;
-}

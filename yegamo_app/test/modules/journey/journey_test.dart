@@ -16,10 +16,10 @@ import 'package:yegamo_app/modules/journey/providers/journey_view_model.dart';
 import 'package:yegamo_app/modules/journey/services/active_journey_repository.dart';
 import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/models/data_state.dart';
-import 'package:yegamo_app/shared/services/connectivity_service.dart';
 import 'package:yegamo_app/shared/storage/local_storage.dart';
 
 import '../test_support.dart';
+import '../../support/fakes.dart';
 
 Map<String, Object?> _leg(String mode, String instruction) => {
   'mode': mode,
