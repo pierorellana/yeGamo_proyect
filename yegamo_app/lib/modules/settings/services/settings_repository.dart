@@ -30,13 +30,26 @@ class SettingsRepository {
     return load();
   }
 
+  /// Invitado: exporta el contenido local. Con sesión además solicita al API la
+  /// exportación de la cuenta (`POST /v1/me/data-export`, respuesta 202).
   Future<SettingsState> exportLocalData() async {
+    String? accountMessage;
+    if (_session.isAuthenticated) {
+      final response = await _apiClient.post<Object?>(
+        'me/data-export',
+        idempotencyKey: 'privacy-export-${DateTime.now().toUtc().toIso8601String().substring(0, 10)}',
+      );
+      accountMessage = response.isSuccess
+          ? 'Solicitamos la exportación de tu cuenta.'
+          : response.error?.message ?? 'No fue posible solicitar la exportación de la cuenta.';
+    }
     final data = await _privacy.exportLocalData();
     await _storage.write(
       YeGamoStorageKeys.privacyExportedAt,
       DateTime.now().toUtc().toIso8601String(),
     );
-    return (await load()).copyWithExport(jsonEncode(data));
+    final state = (await load()).copyWithExport(jsonEncode(data));
+    return accountMessage == null ? state : state.withMessage(accountMessage);
   }
 
   Future<SettingsState> deleteData() async {
