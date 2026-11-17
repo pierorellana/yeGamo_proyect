@@ -71,6 +71,8 @@ void main() {
         },
       );
       final storage = InMemoryLocalStorage();
+    // Los viajes activos del API exigen sesión; el invitado sigue en modo local.
+    await storage.write(YeGamoStorageKeys.sessionMode, 'authenticated');
 
       await tester.pumpWidget(
         TaskFiveApp(

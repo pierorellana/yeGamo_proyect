@@ -22,6 +22,8 @@ void main() {
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     final storage = InMemoryLocalStorage();
+    // Los viajes activos del API exigen sesión; el invitado sigue en modo local.
+    await storage.write(YeGamoStorageKeys.sessionMode, 'authenticated');
     await storage.write(YeGamoStorageKeys.onboardingCompleted, 'true');
     final apiClient = testClient((request) async {
       if (request.uri.path == '/v1/journeys/plan') {

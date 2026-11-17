@@ -155,9 +155,16 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
         arguments['optionId'] is String) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
+        final planner = context.read<PlannerViewModel>();
+        final planId = arguments['planId'] as String;
+        final optionId = arguments['optionId'] as String;
+        final plan = planner.state.plan;
         context.read<JourneyViewModel>().start(
-          arguments['planId'] as String,
-          arguments['optionId'] as String,
+          planId,
+          optionId,
+          option: plan?.planId == planId
+              ? plan!.options.where((o) => o.id == optionId).firstOrNull
+              : null,
         );
       });
     }
@@ -170,7 +177,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
         title: Text(finish ? '¿Finalizar viaje?' : '¿Cancelar viaje?'),
         content: Text(
           finish
-              ? 'Marcaremos el viaje como terminado en este dispositivo y en el API.'
+              ? 'Marcaremos el viaje como terminado.'
               : 'Se cancelará el viaje activo. Puedes iniciar otro después.',
         ),
         actions: [

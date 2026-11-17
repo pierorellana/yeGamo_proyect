@@ -16,10 +16,17 @@ import 'package:yegamo_app/modules/journey/providers/journey_view_model.dart';
 import 'package:yegamo_app/modules/journey/services/active_journey_repository.dart';
 import 'package:yegamo_app/shared/location/location_service.dart';
 import 'package:yegamo_app/shared/models/data_state.dart';
+import 'package:yegamo_app/shared/session/session_service.dart';
 import 'package:yegamo_app/shared/storage/local_storage.dart';
 
 import '../test_support.dart';
 import '../../support/fakes.dart';
+
+Future<SessionManager> _signedIn(LocalStorage storage) async {
+  final session = SessionManager(storage);
+  await session.setAuthenticated(accessToken: 'test-token');
+  return session;
+}
 
 Map<String, Object?> _leg(String mode, String instruction) => {
   'mode': mode,
@@ -83,6 +90,7 @@ void main() {
       storage,
       FakeConnectivityService(),
       PrivacyAwareLocationReader(location, consent),
+      await _signedIn(storage),
     );
     final vm = JourneyViewModel(repo);
 
@@ -132,6 +140,7 @@ void main() {
         ),
         consent,
       ),
+      await _signedIn(storage),
     );
     final vm = JourneyViewModel(repo);
     await vm.start('plan-1', 'option-1');
@@ -150,12 +159,66 @@ void main() {
       storage,
       FakeConnectivityService(),
       PrivacyAwareLocationReader(FakeLocationService(), consent),
+      await _signedIn(storage),
     );
     final result = await repo.start('plan-1', 'option-1');
 
     expect(result.journey, isNull);
     expect(result.error?.code, 'INVALID_RESPONSE');
     expect(await storage.read(YeGamoStorageKeys.activeJourney), isNull);
+  });
+
+  test('guest journeys are local, built from the real plan option and never call the API', () async {
+    final storage = InMemoryLocalStorage();
+    final consent = LocationConsentStore(storage);
+    final requests = <HttpRequest>[];
+    final repo = ActiveJourneyRepository(
+      testClient((request) async {
+        requests.add(request);
+        return jsonResponse(activeJourneyBody());
+      }),
+      storage,
+      FakeConnectivityService(),
+      PrivacyAwareLocationReader(FakeLocationService(), consent),
+      SessionManager(storage),
+    );
+    final option = JourneyOption.fromJson({
+      'id': 'opt-1',
+      'durationMin': 10,
+      'walkMin': 10,
+      'transfers': 0,
+      'reliability': {'score': null, 'level': null, 'sampleSize': null},
+      'dataQuality': {'dataState': 'DEGRADED', 'liveVehicle': false, 'sourceAuthorized': false},
+      'legs': [_leg('WALK', 'Uno'), _leg('WALK', 'Dos')],
+    });
+
+    final started = await repo.start('plan-1', 'opt-1', option: option);
+    expect(started.journey?.legs, hasLength(2));
+    expect(started.journey?.dataState, DataState.degraded);
+    expect(started.journey?.sourceAuthorized, isFalse);
+    expect(ActiveJourneyRepository.isLocal(started.journey!), isTrue);
+
+    final moved = await repo.updateProgress(const JourneyProgress(currentLegIndex: 1));
+    expect(moved.journey?.currentLegIndex, 1);
+    final done = await repo.finish();
+    expect(done.journey?.status, JourneyStatus.finished);
+    expect(requests, isEmpty);
+    expect(await storage.read(YeGamoStorageKeys.activeJourney), isNull);
+  });
+
+  test('a guest without a plan option gets an explicit sign-in error, not a fake journey', () async {
+    final storage = InMemoryLocalStorage();
+    final consent = LocationConsentStore(storage);
+    final repo = ActiveJourneyRepository(
+      testClient((_) async => jsonResponse(activeJourneyBody())),
+      storage,
+      FakeConnectivityService(),
+      PrivacyAwareLocationReader(FakeLocationService(), consent),
+      SessionManager(storage),
+    );
+    final result = await repo.start('plan-1', 'opt-1');
+    expect(result.journey, isNull);
+    expect(result.error?.code, 'AUTH_REQUIRED');
   });
 
   test('maps API statuses and never sends UI-only states', () {
@@ -175,6 +238,7 @@ void main() {
       storage,
       FakeConnectivityService(online: false),
       PrivacyAwareLocationReader(FakeLocationService(), consent),
+      await _signedIn(storage),
     );
     final vm = JourneyViewModel(repo);
 
@@ -184,7 +248,7 @@ void main() {
     expect(vm.state.journey, isNull);
   });
 
-  test('permission is an explicit recoverable state', () {
+  test('permission is an explicit recoverable state', () async {
     final storage = InMemoryLocalStorage();
     final consent = LocationConsentStore(storage);
     final vm = JourneyViewModel(
@@ -193,6 +257,7 @@ void main() {
         storage,
         FakeConnectivityService(),
         PrivacyAwareLocationReader(FakeLocationService(), consent),
+      await _signedIn(storage),
       ),
     );
 
@@ -221,6 +286,7 @@ void main() {
       });
       final storage = InMemoryLocalStorage();
       await storage.write('onboarding_completed', 'true');
+      await storage.write(YeGamoStorageKeys.sessionMode, 'authenticated');
       final ApiClient client = testClient((request) async {
         if (request.uri.path.contains('active-journeys') ||
             request.uri.path.endsWith('/start')) {

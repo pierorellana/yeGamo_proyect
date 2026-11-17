@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../shared/models/data_state.dart';
+import '../../planner/models/planner_models.dart';
 import '../models/journey_models.dart';
 import '../services/active_journey_repository.dart';
 
@@ -14,8 +15,12 @@ class JourneyViewModel extends ChangeNotifier {
   JourneyState get state => _state;
   bool get loading => _loading;
 
-  Future<void> start(String planId, String optionId) async {
-    await _run(() => _repository.start(planId, optionId));
+  Future<void> start(
+    String planId,
+    String optionId, {
+    JourneyOption? option,
+  }) async {
+    await _run(() => _repository.start(planId, optionId, option: option));
   }
 
   Future<void> updateProgress(JourneyProgress progress) async {

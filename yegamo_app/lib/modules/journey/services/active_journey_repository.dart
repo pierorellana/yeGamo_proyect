@@ -5,7 +5,9 @@ import '../../../shared/models/api_error.dart';
 import '../../../shared/models/data_state.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/connectivity_service.dart';
+import '../../../shared/session/session_service.dart';
 import '../../../shared/storage/local_storage.dart';
+import '../../planner/models/planner_models.dart';
 import '../models/journey_models.dart';
 
 class ActiveJourneyRepository {
@@ -14,6 +16,7 @@ class ActiveJourneyRepository {
     this._storage,
     this._connectivity,
     this._locationReader,
+    this._session,
   );
 
   static const cacheKey = YeGamoStorageKeys.activeJourney;
@@ -21,8 +24,17 @@ class ActiveJourneyRepository {
   final LocalStorage _storage;
   final ConnectivityService _connectivity;
   final PrivacyAwareLocationReader _locationReader;
+  final SessionManager _session;
 
-  Future<ActiveJourneyResult> start(String planId, String optionId) async {
+  /// Con cuenta el viaje se registra en el API. Como invitado (ADR-006: el API
+  /// exige JWT para viajes activos) el seguimiento es local y se construye
+  /// únicamente con los tramos reales de la opción elegida; nunca se simula.
+  Future<ActiveJourneyResult> start(
+    String planId,
+    String optionId, {
+    JourneyOption? option,
+  }) async {
+    if (!_session.isAuthenticated) return _startLocal(planId, option);
     if (!await _connectivity.isOnline) return _offlineResult();
     // Una clave por intento: reiniciar el mismo plan tras cancelar no debe
     // reproducir la respuesta del viaje anterior.
@@ -34,12 +46,48 @@ class ActiveJourneyRepository {
     return await _map(response);
   }
 
+  Future<ActiveJourneyResult> _startLocal(
+    String planId,
+    JourneyOption? option,
+  ) async {
+    if (option == null || option.legs.isEmpty) {
+      return const ActiveJourneyResult(
+        error: ApiError(
+          code: 'AUTH_REQUIRED',
+          message:
+              'Inicia sesión para registrar el viaje o vuelve a calcular el plan.',
+        ),
+      );
+    }
+    final journey = ActiveJourney(
+      id: '$localIdPrefix${DateTime.now().microsecondsSinceEpoch}',
+      planId: planId,
+      optionId: option.id,
+      status: JourneyStatus.active,
+      dataState: option.dataQuality.dataState,
+      legs: option.legs,
+      dataQuality: option.dataQuality,
+    );
+    await _writeCache(journey);
+    return ActiveJourneyResult(journey: journey);
+  }
+
+  /// Los viajes locales (invitado) nunca se envían al API.
+  static const localIdPrefix = 'local-journey-';
+  static bool isLocal(ActiveJourney journey) =>
+      journey.id.startsWith(localIdPrefix);
+
   Future<ActiveJourneyResult> updateProgress(JourneyProgress progress) async {
     final cached = await _readCache();
     if (cached == null) {
       return const ActiveJourneyResult(
         error: ApiError(code: 'NO_ACTIVE_JOURNEY', message: 'No hay un viaje activo.'),
       );
+    }
+    if (isLocal(cached)) {
+      final moved = cached.copyWith(currentLegIndex: progress.currentLegIndex);
+      await _writeCache(moved);
+      return ActiveJourneyResult(journey: moved);
     }
     final location = await _locationReader.readIfConsented();
     if (!await _connectivity.isOnline) return _offlineResult(cached: cached);
@@ -62,6 +110,16 @@ class ActiveJourneyRepository {
     if (cached == null) {
       return const ActiveJourneyResult(
         error: ApiError(code: 'NO_ACTIVE_JOURNEY', message: 'No hay un viaje activo.'),
+      );
+    }
+    if (isLocal(cached)) {
+      await _storage.remove(cacheKey);
+      return ActiveJourneyResult(
+        journey: cached.copyWith(
+          status: action == 'finish'
+              ? JourneyStatus.finished
+              : JourneyStatus.canceled,
+        ),
       );
     }
     if (!await _connectivity.isOnline) {
