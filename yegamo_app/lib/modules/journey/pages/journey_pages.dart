@@ -14,6 +14,7 @@ import '../../planner/models/planner_models.dart';
 import '../../planner/providers/planner_view_model.dart';
 import '../models/journey_models.dart';
 import '../services/leg_progress_advisor.dart';
+import '../../../shared/map/route_overlay.dart';
 import '../providers/journey_view_model.dart';
 import '../widgets/active_journey_widgets.dart';
 import '../widgets/arrival_widgets.dart';
@@ -264,12 +265,34 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> {
     );
   }
 
+  YgMapScope? _routeScope;
+  String _routeKey = '';
+
+  @override
+  void dispose() {
+    final scope = _routeScope;
+    if (scope != null) Future<void>.microtask(scope.clearRoute);
+    super.dispose();
+  }
+
+  /// Dibuja en el mapa el recorrido real del viaje (extremos y tramos a pie).
+  void _publishRoute(JourneyOption? option) {
+    final scope = _routeScope ??= context.read<YgMapScope>();
+    final overlay = RouteOverlay.forOption(option);
+    if (overlay.key == _routeKey) return;
+    _routeKey = overlay.key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) scope.showRoute(overlay.points, overlay.lines);
+    });
+  }
+
   Widget _buildActive(
     JourneyViewModel vm,
     ActiveJourney journey,
     JourneyPlan? plan,
     JourneyOption? option,
   ) {
+    _publishRoute(option);
     final visibleBottom = 844 - _sheetBottom - _sheetHeight - 16;
     final legIndex = currentLegIndex(journey, option);
     final phase = tripPhaseFor(journey, option);

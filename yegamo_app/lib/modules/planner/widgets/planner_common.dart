@@ -2,14 +2,17 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:provider/provider.dart';
 
 import '../../../shared/design_system/yg_components.dart';
 import '../../../shared/map/yg_map_controls.dart';
+import '../../../shared/map/route_overlay.dart';
 import '../../../shared/map/yg_map_host.dart';
 import '../../../shared/map/yg_map_view.dart';
 import '../../../shared/models/data_state.dart';
 import '../../../shared/widgets/data_quality_badge.dart';
 import '../models/planner_models.dart';
+import '../providers/planner_view_model.dart';
 
 // ---------------------------------------------------------------------------
 // Formato de horas y textos (todo se deriva de datos reales del plan).
@@ -541,11 +544,39 @@ class _PlannerFlowScaffoldState extends State<PlannerFlowScaffold> {
     ));
   }
 
+  YgMapScope? _scope;
+  String _publishedKey = '';
+
   @override
   void dispose() {
+    final scope = _scope;
+    if (scope != null) {
+      // Fuera del árbol bloqueado: limpiar notifica a los oyentes del mapa.
+      Future<void>.microtask(scope.clearRoute);
+    }
     if (_ownsSnap) _snap.dispose();
     _sheet.dispose();
     super.dispose();
+  }
+
+  /// Publica en el mapa el recorrido de la opción elegida (datos reales del plan).
+  void _publishRoute(JourneyOption? option) {
+    final scope = _scope ??= _readScope();
+    if (scope == null) return;
+    final overlay = RouteOverlay.forOption(option);
+    if (overlay.key == _publishedKey) return;
+    _publishedKey = overlay.key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) scope.showRoute(overlay.points, overlay.lines);
+    });
+  }
+
+  YgMapScope? _readScope() {
+    try {
+      return context.read<YgMapScope>();
+    } on ProviderNotFoundException {
+      return null;
+    }
   }
 
   void _onHeight(double h, double b) {
@@ -566,6 +597,9 @@ class _PlannerFlowScaffoldState extends State<PlannerFlowScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.step >= 2) {
+      _publishRoute(context.watch<PlannerViewModel>().selectedOption);
+    }
     return YgMapScaffold(
       body: Stack(
         fit: StackFit.expand,

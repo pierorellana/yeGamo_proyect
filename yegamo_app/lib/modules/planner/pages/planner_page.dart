@@ -58,7 +58,10 @@ class _PlannerPageState extends State<PlannerPage> {
       final m = t.hour * 60 + t.minute;
       _minutes = ((m + 4) ~/ 5 * 5) % 1440;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrentOrigin());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCurrentOrigin();
+      _mapScope = context.read<YgMapScope>()..setTapHandler(this, _onMapTap);
+    });
   }
 
   @override
@@ -76,8 +79,32 @@ class _PlannerPageState extends State<PlannerPage> {
     _destinationController.text = arguments.name;
   }
 
+  YgMapScope? _mapScope;
+
+  /// Selección por toque en el mapa: rellena el campo activo (origen si está
+  /// enfocado; destino en otro caso) con las coordenadas tocadas, ya validadas.
+  void _onMapTap(GeoCoordinate tapped) {
+    final point = JourneyPoint(
+      latitude: tapped.latitude,
+      longitude: tapped.longitude,
+    );
+    final label =
+        'Punto en el mapa (${tapped.latitude.toStringAsFixed(5)}, ${tapped.longitude.toStringAsFixed(5)})';
+    if (_activeField == _PlannerField.origin || _originFocus.hasFocus) {
+      _originLabel = label;
+      _originPoint = point;
+      _originController.text = label;
+    } else {
+      _destinationLabel = label;
+      _destinationPoint = point;
+      _destinationController.text = label;
+    }
+    setState(() => _inputError = null);
+  }
+
   @override
   void dispose() {
+    _mapScope?.releaseTapHandler(this);
     _originController.dispose();
     _destinationController.dispose();
     _originFocus.dispose();

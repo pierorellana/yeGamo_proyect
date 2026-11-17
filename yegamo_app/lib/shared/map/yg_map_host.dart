@@ -152,7 +152,9 @@ class YgMapHost extends StatelessWidget {
                   config: config,
                   locationService: context.read<LocationService>(),
                   mapController: scope.controller,
-                  points: points,
+                  points: [...points, ...scope.routePoints],
+                  lines: scope.routeLines,
+                  onTap: (point) => scope.tapHandler?.call(point),
                   focusTarget: scope.focusTarget,
                   focusRequestVersion: scope.focusRequestVersion,
                 )

@@ -1,9 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
 
 import '../location/location_service.dart';
+import 'yg_real_map.dart';
+import 'package:flutter/widgets.dart';
 
 /// Modo de la capa de mapa (equivale a `view.mode` de MapLayer del prototipo).
 enum YgMapMode {
@@ -187,12 +188,56 @@ class YgMapScope extends ChangeNotifier {
 
   YgMapView _view = const YgMapView();
   final YgMapController controller = YgMapController();
+  List<YgMapPoint> _routePoints = const [];
+  List<YgMapLine> _routeLines = const [];
+  ValueChanged<GeoCoordinate>? _tapHandler;
+  Object? _tapOwner;
   Object? _owner;
   GeoCoordinate? _focusTarget;
   int _focusRequestVersion = 0;
 
   YgMapView get view => _view;
   GeoCoordinate? get focusTarget => _focusTarget;
+  List<YgMapPoint> get routePoints => _routePoints;
+  List<YgMapLine> get routeLines => _routeLines;
+  ValueChanged<GeoCoordinate>? get tapHandler => _tapHandler;
+
+  /// La pantalla activa publica el recorrido real que debe dibujarse.
+  void showRoute(List<YgMapPoint> points, List<YgMapLine> lines) {
+    if (_disposed) return;
+    _routePoints = points;
+    _routeLines = lines;
+    notifyListeners();
+  }
+
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void clearRoute() {
+    if (_disposed) return; // Llamado desde un microtask tras cerrar la app.
+    if (_routePoints.isEmpty && _routeLines.isEmpty) return;
+    _routePoints = const [];
+    _routeLines = const [];
+    notifyListeners();
+  }
+
+  /// Registra quién recibe los toques del mapa (selección de ubicación).
+  void setTapHandler(Object owner, ValueChanged<GeoCoordinate>? handler) {
+    _tapOwner = handler == null ? null : owner;
+    _tapHandler = handler;
+  }
+
+  void releaseTapHandler(Object owner) {
+    if (_tapOwner == owner) {
+      _tapOwner = null;
+      _tapHandler = null;
+    }
+  }
   int get focusRequestVersion => _focusRequestVersion;
 
   void focusOn(GeoCoordinate point) {

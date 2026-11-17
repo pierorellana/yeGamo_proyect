@@ -28,7 +28,17 @@ class YgMapPoint {
   final String dataState;
 }
 
-enum YgMapPointKind { stop, place }
+enum YgMapPointKind { stop, place, origin, destination }
+
+/// Segmento dibujable. Solo se crea a partir de coordenadas que entrega el plan
+/// (extremos de un tramo a pie); nunca se interpola una ruta de transporte.
+class YgMapLine {
+  const YgMapLine({required this.id, required this.coordinates, this.dashed = true});
+
+  final String id;
+  final List<GeoCoordinate> coordinates;
+  final bool dashed;
+}
 
 class YgRealMap extends StatefulWidget {
   const YgRealMap({
@@ -38,6 +48,8 @@ class YgRealMap extends StatefulWidget {
     required this.locationService,
     required this.mapController,
     this.points = const <YgMapPoint>[],
+    this.lines = const <YgMapLine>[],
+    this.onTap,
     this.focusTarget,
     this.focusRequestVersion = 0,
   });
@@ -47,6 +59,10 @@ class YgRealMap extends StatefulWidget {
   final LocationService locationService;
   final YgMapController mapController;
   final List<YgMapPoint> points;
+  final List<YgMapLine> lines;
+
+  /// Toque sobre el mapa con coordenadas válidas (selección de ubicación).
+  final ValueChanged<GeoCoordinate>? onTap;
   final GeoCoordinate? focusTarget;
   final int focusRequestVersion;
 
@@ -223,6 +239,37 @@ class _YgRealMapState extends State<YgRealMap> {
             circleStrokeWidth: 2,
           ),
         );
+        await controller.addGeoJsonSource('yegamo-routes', _lineCollection());
+        await controller.addLineLayer(
+          'yegamo-routes',
+          'yegamo-routes-layer',
+          const LineLayerProperties(
+            lineColor: '#4C583E',
+            lineWidth: 4,
+            lineDasharray: <double>[2, 2],
+            lineCap: 'round',
+          ),
+        );
+        await controller.addGeoJsonSource(
+          'yegamo-endpoints',
+          _featureCollection(YgMapPointKind.origin, YgMapPointKind.destination),
+        );
+        await controller.addCircleLayer(
+          'yegamo-endpoints',
+          'yegamo-endpoints-layer',
+          const CircleLayerProperties(
+            circleRadius: 9,
+            circleColor: <dynamic>[
+              'match',
+              <dynamic>['get', 'kind'],
+              'origin',
+              '#2F7D4F',
+              '#9C4F3A',
+            ],
+            circleStrokeColor: '#FFFFFF',
+            circleStrokeWidth: 3,
+          ),
+        );
         _dynamicLayersAdded = true;
       }
       await _updateSources();
@@ -245,16 +292,77 @@ class _YgRealMapState extends State<YgRealMap> {
         'yegamo-places',
         _featureCollection(YgMapPointKind.place),
       );
+      await controller.setGeoJsonSource('yegamo-routes', _lineCollection());
+      await controller.setGeoJsonSource(
+        'yegamo-endpoints',
+        _featureCollection(YgMapPointKind.origin, YgMapPointKind.destination),
+      );
+      await _fitRoute(controller);
     } on Exception {
       if (mounted) setState(() => _mapUnavailable = true);
     }
   }
 
-  Map<String, dynamic> _featureCollection(YgMapPointKind kind) {
+  Map<String, dynamic> _lineCollection() => <String, dynamic>{
+    'type': 'FeatureCollection',
+    'features': widget.lines
+        .where((line) => line.coordinates.length >= 2)
+        .map(
+          (line) => <String, dynamic>{
+            'type': 'Feature',
+            'id': line.id,
+            'geometry': <String, dynamic>{
+              'type': 'LineString',
+              'coordinates': [
+                for (final c in line.coordinates) <double>[c.longitude, c.latitude],
+              ],
+            },
+            'properties': <String, dynamic>{'dashed': line.dashed},
+          },
+        )
+        .toList(growable: false),
+  };
+
+  String _lastFitKey = '';
+
+  /// Encuadra el recorrido (extremos y segmentos) cuando cambia.
+  Future<void> _fitRoute(MapLibreMapController controller) async {
+    final coords = <GeoCoordinate>[
+      for (final p in widget.points)
+        if (p.kind == YgMapPointKind.origin || p.kind == YgMapPointKind.destination)
+          GeoCoordinate(latitude: p.latitude, longitude: p.longitude),
+      for (final l in widget.lines) ...l.coordinates,
+    ];
+    final key = coords.map((c) => '${c.latitude},${c.longitude}').join('|');
+    if (coords.length < 2 || key == _lastFitKey) return;
+    _lastFitKey = key;
+    var south = coords.first.latitude, north = south;
+    var west = coords.first.longitude, east = west;
+    for (final c in coords) {
+      south = min(south, c.latitude);
+      north = max(north, c.latitude);
+      west = min(west, c.longitude);
+      east = max(east, c.longitude);
+    }
+    await controller.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(southwest: LatLng(south, west), northeast: LatLng(north, east)),
+        left: 48,
+        right: 48,
+        top: 120,
+        bottom: 320,
+      ),
+    );
+  }
+
+  Map<String, dynamic> _featureCollection(
+    YgMapPointKind kind, [
+    YgMapPointKind? alsoKind,
+  ]) {
     return <String, dynamic>{
       'type': 'FeatureCollection',
       'features': widget.points
-          .where((point) => point.kind == kind)
+          .where((point) => point.kind == kind || point.kind == alsoKind)
           .map(
             (point) => <String, dynamic>{
               'type': 'Feature',
@@ -295,6 +403,14 @@ class _YgRealMapState extends State<YgRealMap> {
               zoom: 12.5,
             ),
             onMapCreated: _onMapCreated,
+            onMapClick: (_, latLng) {
+              final lat = latLng.latitude;
+              final lon = latLng.longitude;
+              // Solo coordenadas válidas llegan a la pantalla que seleccionó el punto.
+              if (lat.isFinite && lon.isFinite && lat.abs() <= 90 && lon.abs() <= 180) {
+                widget.onTap?.call(GeoCoordinate(latitude: lat, longitude: lon));
+              }
+            },
             onStyleLoadedCallback: _onStyleLoaded,
             gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
               Factory<EagerGestureRecognizer>(EagerGestureRecognizer.new),
