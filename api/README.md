@@ -86,6 +86,26 @@ OVERPASS_BASE_URL='https://overpass-api.de/api/interpreter' \
 npm run start:dev
 ```
 
+## Variables de entorno (referencia)
+
+Ninguna lleva secretos en el repositorio; `api/.env` está ignorado por git.
+
+| Variable | Uso | Por defecto |
+|---|---|---|
+| `NODE_ENV` | `production` desactiva el proveedor demo y exige configuración explícita | `development` |
+| `DATABASE_URL` | PostgreSQL + PostGIS (obligatoria para persistencia) | — |
+| `OIDC_ISSUER_URL`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL` | Validación de JWT de cuenta. Sin ellos las rutas de cuenta responden 401 `IDENTITY=UNAVAILABLE` | — |
+| `DEMO_PROVIDER_ENABLED` | `true` solo fuera de producción: planificador fixture (tramos a pie, `DEGRADED`) | `false` |
+| `OVERPASS_*`, `NOMINATIM_*` | Descubrimiento de paradas y geocodificación OSM (ver ADR-010) | ver arriba |
+| `WORKERS_ENABLED` | `true` activa el scheduler en proceso (avisos, entrega, salud de proveedores, retención) | `false` |
+| `WORKER_ALERTS_INTERVAL_MS`, `WORKER_DELIVERY_INTERVAL_MS`, `WORKER_HEALTH_INTERVAL_MS`, `WORKER_RETENTION_INTERVAL_MS` | Periodicidad de cada job (mín. 1000) | 30 s / 60 s / 5 min / 1 h |
+| `RATE_LIMIT_PER_MINUTE` | Solicitudes por IP y minuto (`0` desactiva) | `120` |
+| `RATE_LIMIT_PLAN_PER_MINUTE` | Límite de `POST /v1/journeys/plan` | `20` |
+
+Producción: migrar con `npm run db:migrate` (checksum verificado y bloqueo
+consultivo), validar con `npm run db:verify`, y comprobar la persistencia con
+`DATABASE_URL=… npm run test:e2e`.
+
 ## Acceso desde un iPhone por datos móviles
 
 En VS Code, abre la vista **Ports**, reenvía el puerto `3000`, cambia la

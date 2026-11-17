@@ -88,3 +88,17 @@ lib/modules/      onboarding, descubrimiento, planificación, viaje y retención
 test/fixtures/    fixtures deterministas sólo para pruebas
 integration_test/ flujos baseline con transporte falso
 ```
+
+
+## Configuración de compilación (`--dart-define`)
+
+| Define | Uso |
+|---|---|
+| `YEGAMO_ENV` | `development` \| `staging` \| `production` (en producción nunca se muestran datos demo) |
+| `YEGAMO_API_BASE_URL` | URL base del API (HTTPS en staging/producción) |
+| `YEGAMO_DEMO_DATA` | Solo desarrollo: catálogo demo y overlays del mapa |
+| `YEGAMO_REAL_MAP`, `YEGAMO_MAP_STYLE_URL`, `YEGAMO_MAP_TILE_URL` | Mapa |
+| `YEGAMO_OIDC_TOKEN_ENDPOINT`, `YEGAMO_OIDC_CLIENT_ID` | Renovación de sesión OIDC (valores públicos). Vacíos = sin inicio de sesión: la app opera como invitado |
+
+Los datos de transporte vienen siempre del API; sin proveedor la app muestra
+«no disponible» en lugar de inventar rutas, horarios o ETA (ADR-010).

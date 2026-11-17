@@ -27,6 +27,8 @@ Estado de la colección: `accepted`
 | [ADR-006 — Auth guest/OIDC/JWT](ADR-006-oidc-jwt-authentication.md) | accepted · 2026-10-02 | Invitado, cuenta opcional, JWT y guest migration | `11_API_SPEC.md`, `17_SECURITY_PRIVACY.md` |
 | [ADR-007 — Archivos sensibles](ADR-007-sensitive-files-policy.md) | accepted · 2026-10-02 | Secretos, credenciales, exports, dumps y artefactos locales | `17_SECURITY_PRIVACY.md`, `20_RISKS_ASSUMPTIONS.md` |
 | [ADR-009 — Baseline visual «Bosque claro»](ADR-009-light-prototype-visual-baseline.md) | accepted · 2026-10-12 | Tema claro, iconos SVG, mapa persistente, movimiento | `15_MOBILE_FLUTTER_SPEC.md`, `25_DESIGN_SYSTEM.md` |
+| [ADR-010 — Fuente de transporte para Guayaquil](ADR-010-guayaquil-transit-data-source.md) | accepted · 2026-11-17 | Investigación de fuentes, OSM como única fuente real, límites honestos | `09_EXTERNAL_DATA_RESEARCH.md`, `10_INTEGRATION_STRATEGY.md` |
+| [ADR-011 — Viajes de invitado, planes persistidos e identidad](ADR-011-mvp-completion-identity-and-guest-journeys.md) | accepted · 2026-11-17 | Persistencia de planes, contrato de viaje activo, login pendiente de proveedor | `11_API_SPEC.md`, `17_SECURITY_PRIVACY.md` |
 
 ## Decisiones complementarias
 

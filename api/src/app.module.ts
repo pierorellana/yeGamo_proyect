@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+
+import { RateLimitGuard } from './shared/http/rate-limit.guard';
 
 import { AppConfigModule } from './config/config.module';
 import { JourneysModule } from './journeys/journeys.module';
@@ -32,5 +35,6 @@ import { WorkerModule } from './worker/worker.module';
     ActiveJourneysModule,
     WorkerModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: RateLimitGuard }],
 })
 export class AppModule {}
