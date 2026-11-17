@@ -16,6 +16,12 @@ export interface LeaveAlertRepository {
   delete(userId: string, id: string): Promise<boolean>;
   due(now: Date): Promise<Array<LeaveAlert & { userId: string }>>;
   markTriggered(id: string): Promise<void>;
+  /**
+   * Atomically takes a SCHEDULED alert (SCHEDULED → TRIGGERED). Returns false when
+   * another worker or a cancellation got there first, so an alert fires once.
+   */
+  claim(id: string, now: Date): Promise<boolean>;
+  markExpired(id: string): Promise<void>;
 }
 
 export const LEAVE_ALERT_REPOSITORY = Symbol('LEAVE_ALERT_REPOSITORY');

@@ -24,11 +24,19 @@ export class WorkerService {
   async runAlerts(now = new Date(), force = false): Promise<WorkerRunResult> {
     if (!this.isEnabled() && !force) return disabled('alerts', now);
     const due = await this.alerts.due(now);
+    let processed = 0;
     for (const alert of due) {
+      // A stale alert (e.g. the API was down) must not announce a moment that already passed.
+      if (now.getTime() - Date.parse(alert.scheduledFor) > STALE_ALERT_MS) {
+        await this.alerts.markExpired(alert.id);
+        continue;
+      }
+      // Claim first: with several workers (or a concurrent cancel) the alert fires at most once.
+      if (!(await this.alerts.claim(alert.id, now))) continue;
       await this.notifications.create(alert.userId, { type: 'LEAVE_ALERT', title: 'Hora de salir', body: 'Tu aviso de salida está listo.', payload: { alertId: alert.id }, deduplicationKey: `leave-alert:${alert.id}` });
-      await this.alerts.markTriggered(alert.id);
+      processed += 1;
     }
-    return { worker: 'alerts', enabled: true, processed: due.length, ranAt: now.toISOString() };
+    return { worker: 'alerts', enabled: true, processed, ranAt: now.toISOString() };
   }
 
   async runDelivery(now = new Date(), force = false): Promise<WorkerRunResult> {
@@ -67,6 +75,8 @@ export class WorkerService {
     return { worker: 'retention', enabled: true, processed: Number(routeObservations) + Number(providerHealth) + Number(reports) + Number(events) + Number(idempotency), ranAt: now.toISOString() };
   }
 }
+
+const STALE_ALERT_MS = 15 * 60 * 1000;
 
 function disabled(worker: string, now: Date): WorkerRunResult { return { worker, enabled: false, processed: 0, ranAt: now.toISOString() }; }
 
