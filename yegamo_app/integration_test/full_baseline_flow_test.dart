@@ -35,7 +35,7 @@ void main() {
           if (path.endsWith('/journeys/plan')) {
             return _json(prototypeJourneyPlanFixture(fixtureClock));
           }
-          if (path.endsWith('/active-journeys')) {
+          if (path.endsWith('/start')) {
             return _json(prototypeActiveJourneyFixture(clock: fixtureClock));
           }
           if (path.contains('/progress')) {
@@ -43,8 +43,7 @@ void main() {
             return _json(
               prototypeActiveJourneyFixture(
                 clock: fixtureClock,
-                status: progressCalls == 1 ? 'GET_OFF_ALERT' : 'ARRIVED',
-                currentStep: progressCalls,
+                currentLegIndex: progressCalls.clamp(0, 1).toInt(),
               ),
             );
           }
@@ -52,8 +51,8 @@ void main() {
             return _json(
               prototypeActiveJourneyFixture(
                 clock: fixtureClock,
-                status: 'FINISHED',
-                currentStep: 2,
+                status: 'COMPLETED',
+                currentLegIndex: 1,
               ),
             );
           }

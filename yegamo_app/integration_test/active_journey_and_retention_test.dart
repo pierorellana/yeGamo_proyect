@@ -27,11 +27,11 @@ void main() {
       if (request.uri.path == '/v1/journeys/plan') {
         return jsonResponse(validPlanBody());
       }
-      if (request.uri.path == '/v1/active-journeys') {
+      if (request.uri.path.endsWith('/start')) {
         return jsonResponse(activeJourneyBody());
       }
       if (request.uri.path.contains('/progress')) {
-        return jsonResponse({...activeJourneyBody(), 'currentStep': 1});
+        return jsonResponse(activeJourneyBody(currentLegIndex: 1));
       }
       return unavailableResponse();
     });
