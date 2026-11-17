@@ -14,9 +14,16 @@ export interface JourneyTransitPort {
   plan(request: JourneyPlanRequest): Promise<TransitPlan>;
 }
 
+export interface SavePlanContext {
+  /** Provider key that produced the plan (kept as audit metadata, never exposed). */
+  providerKey: string;
+  userId?: string | null;
+  expiresAt: Date;
+}
+
 export interface JourneyPlanRepository {
   get(planId: string): Promise<TransitPlan | null>;
-  save(plan: TransitPlan): Promise<void>;
+  save(plan: TransitPlan, request: JourneyPlanRequest, context: SavePlanContext): Promise<void>;
 }
 
 export interface JourneysUseCase {

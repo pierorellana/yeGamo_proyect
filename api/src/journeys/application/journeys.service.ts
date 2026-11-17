@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
+
 import {
-  HttpStatus,
   Inject,
   Injectable,
   NotFoundException,
@@ -48,12 +49,21 @@ export class JourneysService implements JourneysUseCase {
     }
 
     const plan = await this.transit.plan(input);
+    // Provider identifiers are never exposed: every plan and option gets a fresh
+    // canonical UUID so ids are unique, stable after persistence and startable.
     const ordered = {
       ...plan,
-      options: orderOptions(plan.options, input.preference ?? 'BALANCED'),
+      planId: randomUUID(),
+      options: orderOptions(plan.options, input.preference ?? 'BALANCED').map((option) => ({
+        ...option,
+        id: randomUUID(),
+      })),
     } satisfies TransitPlan;
 
-    await this.plans.save(ordered);
+    await this.plans.save(ordered, input, {
+      providerKey: ordered.options[0]?.dataQuality.providerDisplayName ?? 'unknown',
+      expiresAt: new Date(Date.now() + PLAN_TTL_MS),
+    });
     return ordered;
   }
 
@@ -72,17 +82,7 @@ export class JourneysService implements JourneysUseCase {
   }
 }
 
-export class InMemoryJourneyPlanRepository implements JourneyPlanRepository {
-  private readonly plans = new Map<string, TransitPlan>();
-
-  async get(planId: string): Promise<TransitPlan | null> {
-    return this.plans.get(planId) ?? null;
-  }
-
-  async save(plan: TransitPlan): Promise<void> {
-    this.plans.set(plan.planId, plan);
-  }
-}
+const PLAN_TTL_MS = 24 * 60 * 60 * 1000;
 
 function orderOptions(
   options: JourneyOption[],

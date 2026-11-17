@@ -9,15 +9,26 @@ import type {
   TransitPlan,
 } from '../../src/provider-gateway/domain/provider.types';
 import {
+  JOURNEY_PLAN_REPOSITORY,
   JOURNEY_TRANSIT_PORT,
+  JourneyPlanRepository,
   JourneyTransitPort,
 } from '../../src/journeys/domain/journeys.ports';
+
+/** Test double only: production binds the PostgreSQL repository (see journey-persistence.e2e-spec.ts). */
+class InMemoryJourneyPlanRepository implements JourneyPlanRepository {
+  private readonly plans = new Map<string, TransitPlan>();
+  async get(planId: string): Promise<TransitPlan | null> { return this.plans.get(planId) ?? null; }
+  async save(plan: TransitPlan): Promise<void> { this.plans.set(plan.planId, plan); }
+}
 
 const origin = { lat: -2.17, lon: -79.9 };
 const destination = { lat: -2.14, lon: -79.89 };
 
 async function createApp(port?: JourneyTransitPort): Promise<INestApplication> {
-  let builder = NestTest.createTestingModule({ imports: [AppModule] });
+  let builder = NestTest.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(JOURNEY_PLAN_REPOSITORY)
+    .useValue(new InMemoryJourneyPlanRepository());
   if (port !== undefined) {
     builder = builder.overrideProvider(JOURNEY_TRANSIT_PORT).useValue(port);
   }
@@ -134,10 +145,12 @@ describe('journeys canonical planning and repository boundary', () => {
       })
       .expect(200);
 
-    expect(response.body.options.map((option: JourneyOption) => option.id)).toEqual([
-      '550e8400-e29b-41d4-a716-446655440011',
-      '550e8400-e29b-41d4-a716-446655440010',
-    ]);
+    expect(response.body.options.map((option: JourneyOption) => option.durationMin)).toEqual([20, 50]);
+    // Provider identifiers are replaced by canonical UUIDs.
+    expect(response.body.planId).not.toBe('550e8400-e29b-41d4-a716-446655440009');
+    for (const option of response.body.options as JourneyOption[]) {
+      expect(option.id).toMatch(/^[0-9a-f-]{36}$/);
+    }
 
     await request(app.getHttpServer())
       .get(`/v1/journeys/${response.body.planId}`)

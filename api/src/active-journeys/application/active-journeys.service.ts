@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 
 import { IdentityService } from '../../identity/application/identity.service';
 import { IdempotencyService } from '../../shared/idempotency/idempotency.service';
@@ -29,6 +29,9 @@ export class ActiveJourneysService {
     return this.idempotency.execute(userId, key, { id, input }, async () => {
       const current = await this.get(userId, id);
       if (current.status !== 'ACTIVE' && current.status !== 'PLANNED') throw new ConflictException({ code: 'JOURNEY_NOT_ACTIVE', message: 'El viaje ya terminó y no acepta progreso.', details: { status: current.status } });
+      if (input.currentLegIndex !== undefined && input.currentLegIndex >= current.legs.length) {
+        throw new UnprocessableEntityException({ code: 'VALIDATION_ERROR', message: 'currentLegIndex excede los tramos del viaje; finaliza el viaje para registrar la llegada.', details: { validationErrors: [{ property: 'currentLegIndex', constraints: { max: `Debe ser menor que ${current.legs.length}.` } }] } });
+      }
       const payload: Record<string, unknown> = {};
       if (input.location !== undefined) {
         if (!(await this.identity.hasLocationConsent(userId))) throw new ForbiddenException({ code: 'LOCATION_CONSENT_REQUIRED', message: 'Se requiere consentimiento explícito para registrar ubicación precisa.', details: { locationConsent: false } });

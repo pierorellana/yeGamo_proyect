@@ -4,7 +4,7 @@ import { InMemoryIdempotencyStore, IdempotencyService } from '../../src/shared/i
 
 describe('active journeys service', () => {
   it('makes start idempotent and enforces terminal transitions', async () => {
-    const record: ActiveJourneyRecord = { id: 'j-1', optionId: 'o-1', status: 'ACTIVE', currentLegIndex: 0, eta: null, dataState: 'CURRENT', events: [] };
+    const record: ActiveJourneyRecord = { id: 'j-1', planId: 'p-1', optionId: 'o-1', status: 'ACTIVE', currentLegIndex: 0, legs: [], eta: null, dataState: 'CURRENT', dataQuality: null, events: [] };
     let starts = 0;
     const repo: ActiveJourneyRepository = {
       optionBelongsToPlan: async () => true,

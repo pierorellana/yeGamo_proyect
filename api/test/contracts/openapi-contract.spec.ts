@@ -178,6 +178,26 @@ describe('canonical OpenAPI contract', () => {
     const end = nextOffset === -1 ? contract.length : start + 5 + nextOffset;
     return contract.slice(start, end);
   }
+
+  it('defines one canonical active-journey progress protocol', () => {
+    const operations = parseOperations(contract);
+    const start = operations.find((o) => o.method === 'post' && o.path === '/journeys/{planId}/options/{optionId}/start');
+    const progress = operations.find((o) => o.method === 'patch' && o.path === '/active-journeys/{id}/progress');
+    expect(start?.block).toContain("'201'");
+    expect(start?.block).toContain('IdempotencyKeyRequired');
+    expect(progress?.block).toContain('JourneyProgressRequest');
+
+    const request = schemaBlock(contract, 'JourneyProgressRequest');
+    expect(request).toContain('additionalProperties: false');
+    expect(request).toContain('currentLegIndex');
+    expect(request).not.toMatch(/stepIndex|sequence|status:/);
+
+    const journey = schemaBlock(contract, 'ActiveJourney');
+    expect(journey).toContain('required: [id, planId, optionId, status, dataState, currentLegIndex, legs]');
+    expect(journey).not.toMatch(/stepIndex|currentStep|totalSteps/);
+    // The active journey can never claim an ETA without an authorized source.
+    expect(journey).toContain('Siempre null');
+  });
 });
 
 function parseOperations(contract: string): Operation[] {
@@ -233,4 +253,12 @@ async function readControllerSources(directory: string): Promise<string[]> {
     }),
   );
   return files.flat();
+}
+
+function schemaBlock(contract: string, name: string): string {
+  const start = contract.indexOf(`\n    ${name}:\n`);
+  expect(start).toBeGreaterThan(-1);
+  const rest = contract.slice(start + 1);
+  const next = rest.slice(1).search(/\n    [A-Za-z]+:\n/);
+  return next === -1 ? rest : rest.slice(0, next + 1);
 }

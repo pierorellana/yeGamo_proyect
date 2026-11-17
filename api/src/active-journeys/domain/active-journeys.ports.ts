@@ -1,4 +1,4 @@
-import type { DataState, GeoPoint } from '../../provider-gateway/domain/provider.types';
+import type { DataQuality, DataState, GeoPoint, JourneyLeg } from '../../provider-gateway/domain/provider.types';
 
 export type ActiveJourneyStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'ABANDONED';
 
@@ -11,11 +11,16 @@ export interface JourneyEventRecord {
 
 export interface ActiveJourneyRecord {
   readonly id: string;
+  readonly planId: string;
   readonly optionId: string;
   readonly status: ActiveJourneyStatus;
   readonly currentLegIndex: number;
+  /** Canonical legs of the started option, persisted so the client can render instructions. */
+  readonly legs: readonly JourneyLeg[];
+  /** Always null until an authorized source provides a timestamped estimate. */
   readonly eta: null;
   readonly dataState: DataState;
+  readonly dataQuality: DataQuality | null;
   readonly events: readonly JourneyEventRecord[];
 }
 

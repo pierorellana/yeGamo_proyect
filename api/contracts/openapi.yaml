@@ -957,7 +957,7 @@ components:
       type: object
       required: [mode, from, to, durationMin]
       properties:
-        mode: { type: string, enum: [WALK, TRANSIT] }
+        mode: { type: string, enum: [WALK, TRANSIT, TRANSFER, BIKE, OTHER] }
         from: { $ref: '#/components/schemas/GeoPoint' }
         to: { $ref: '#/components/schemas/GeoPoint' }
         durationMin: { type: integer, minimum: 0 }
@@ -973,9 +973,9 @@ components:
       type: object
       required: [score, level, sampleSize]
       properties:
-        score: { type: integer, minimum: 0, maximum: 100 }
-        level: { type: string, enum: [HIGH, MEDIUM, LOW, UNKNOWN] }
-        sampleSize: { type: integer, minimum: 0 }
+        score: { type: integer, minimum: 0, maximum: 100, nullable: true }
+        level: { type: string, enum: [HIGH, MEDIUM, LOW], nullable: true }
+        sampleSize: { type: integer, minimum: 0, nullable: true }
     DataQuality:
       type: object
       required: [freshness, dataState, liveVehicle, observedAt, providerDisplayName]
@@ -988,14 +988,26 @@ components:
         sourceAuthorized: { type: boolean, default: false }
     ActiveJourney:
       type: object
-      required: [id, optionId, status, dataState, currentLegIndex]
+      required: [id, planId, optionId, status, dataState, currentLegIndex, legs]
       properties:
         id: { type: string, format: uuid }
+        planId: { type: string, format: uuid }
         optionId: { type: string, format: uuid }
         status: { type: string, enum: [PLANNED, ACTIVE, COMPLETED, CANCELLED, ABANDONED] }
-        currentLegIndex: { type: integer, minimum: 0 }
-        eta: { $ref: '#/components/schemas/ETAEstimate' }
+        currentLegIndex:
+          type: integer
+          minimum: 0
+          description: Único campo canónico de progreso; no existen alias. Siempre menor que `legs.length`; la llegada se registra con `finish`.
+        legs:
+          type: array
+          description: Tramos persistidos de la opción iniciada, con instrucciones.
+          items: { $ref: '#/components/schemas/JourneyLeg' }
+        eta:
+          nullable: true
+          description: Siempre null hasta que una fuente autorizada entregue un estimado con marca de tiempo.
+          allOf: [{ $ref: '#/components/schemas/ETAEstimate' }]
         dataState: { $ref: '#/components/schemas/DataState' }
+        dataQuality: { $ref: '#/components/schemas/DataQuality' }
         events:
           type: array
           items: { $ref: '#/components/schemas/JourneyEvent' }
