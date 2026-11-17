@@ -158,7 +158,10 @@ class TaskFiveScope extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (context) => PlannerViewModel(
-            repository: JourneyRepository(apiClient: context.read<ApiClient>()),
+            repository: JourneyRepository(
+              apiClient: context.read<ApiClient>(),
+              storage: context.read<LocalStorage>(),
+            ),
           ),
         ),
         ChangeNotifierProvider(

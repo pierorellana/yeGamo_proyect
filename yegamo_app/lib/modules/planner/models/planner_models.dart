@@ -205,6 +205,20 @@ class JourneyOption {
       reliabilityLevel != 'UNKNOWN' &&
       (reliabilityScore > 0 || (reliabilitySamples ?? 0) > 0);
 
+  Map<String, Object?> toJson() => <String, Object?>{
+    'id': id,
+    'durationMin': durationMin,
+    'walkMin': walkMin,
+    'transfers': transfers,
+    'reliability': <String, Object?>{
+      'score': hasReliability ? reliabilityScore : null,
+      'level': reliabilityLevel,
+      'sampleSize': reliabilitySamples,
+    },
+    'dataQuality': dataQuality.toJson(),
+    'legs': legs.map((leg) => leg.toJson()).toList(growable: false),
+  };
+
   factory JourneyOption.fromJson(Map<String, Object?> json) {
     final reliability = json['reliability'] is Map
         ? Map<String, Object?>.from(json['reliability'] as Map)
@@ -251,6 +265,29 @@ class JourneyPlan {
   final DateTime? recommendedLeaveAt;
   final DateTime? arrivalFrom;
   final DateTime? arrivalTo;
+
+  JourneyPlan copyWith({DataState? dataState, List<JourneyOption>? options}) =>
+      JourneyPlan(
+        planId: planId,
+        dataState: dataState ?? this.dataState,
+        options: options ?? this.options,
+        recommendedLeaveAt: recommendedLeaveAt,
+        arrivalFrom: arrivalFrom,
+        arrivalTo: arrivalTo,
+      );
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'planId': planId,
+    'dataState': dataState.apiValue,
+    'recommendedLeaveAt': recommendedLeaveAt?.toUtc().toIso8601String(),
+    'arrivalWindow': arrivalFrom == null || arrivalTo == null
+        ? null
+        : <String, Object?>{
+            'from': arrivalFrom!.toUtc().toIso8601String(),
+            'to': arrivalTo!.toUtc().toIso8601String(),
+          },
+    'options': options.map((option) => option.toJson()).toList(growable: false),
+  };
 
   factory JourneyPlan.fromJson(Map<String, Object?> json) {
     final window = json['arrivalWindow'] is Map

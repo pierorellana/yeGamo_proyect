@@ -33,6 +33,7 @@ abstract final class YeGamoStorageKeys {
   static const recentQueries = 'recent_queries';
   static const privacyExportedAt = 'privacy_exported_at';
   static const leaveAlerts = 'leave_alerts_v1';
+  static const planCache = 'plan_cache_v1';
 
   static const all = <String>[
     onboardingCompleted,
@@ -48,6 +49,7 @@ abstract final class YeGamoStorageKeys {
     recentQueries,
     privacyExportedAt,
     leaveAlerts,
+    planCache,
   ];
 }
 
