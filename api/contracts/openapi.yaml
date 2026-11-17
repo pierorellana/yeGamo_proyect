@@ -1125,17 +1125,34 @@ components:
       type: object
       required: [clientDataVersion, items]
       properties:
-        clientDataVersion: { type: string }
+        clientDataVersion: { type: string, enum: ['1'] }
         items:
           type: array
+          maxItems: 200
+          description: |
+            Elementos `{ type: FAVORITE_PLACE, label, location }` o
+            `{ type: COMMUTE_PROFILE, name, origin, destination, weekdays, targetArrival }`.
+            Cada elemento se valida por separado; los inválidos se rechazan con motivo.
           items: { type: object, additionalProperties: true }
     GuestMigrationResponse:
       type: object
-      required: [migrationId, importedCount, skippedCount, idempotentReplay]
+      required: [migrationId, importedCount, skippedCount, rejectedCount, results, idempotentReplay]
       properties:
         migrationId: { type: string, format: uuid }
-        importedCount: { type: integer, minimum: 0 }
-        skippedCount: { type: integer, minimum: 0 }
+        importedCount: { type: integer, minimum: 0, description: Elementos creados. }
+        skippedCount: { type: integer, minimum: 0, description: Duplicados que ya existían (no se recrean). }
+        rejectedCount: { type: integer, minimum: 0, description: Elementos inválidos. }
+        results:
+          type: array
+          items:
+            type: object
+            required: [index, type, status, reason, id]
+            properties:
+              index: { type: integer, minimum: 0 }
+              type: { type: string }
+              status: { type: string, enum: [IMPORTED, DUPLICATE, REJECTED] }
+              reason: { type: string, nullable: true, enum: [INVALID_COORDINATES, INVALID_FIELD, UNSUPPORTED_TYPE, ALREADY_EXISTS, LIMIT_REACHED] }
+              id: { type: string, format: uuid, nullable: true }
         idempotentReplay: { type: boolean }
     DataExportRequest:
       type: object

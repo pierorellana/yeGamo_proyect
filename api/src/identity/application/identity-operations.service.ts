@@ -1,9 +1,10 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { IdempotencyService } from '../../shared/idempotency/idempotency.service';
 import { hashRequest } from '../../shared/idempotency/idempotency.service';
 import type { AuthPrincipal } from '../domain/identity.ports';
 import type { DeviceInstallationDto, GuestMigrationDto } from '../http/identity.dto';
+import { MAX_MIGRATION_ITEMS, MigrationItemResult, SUPPORTED_CLIENT_DATA_VERSION, migrateItem } from './guest-migration';
 
 @Injectable()
 export class IdentityOperationsService {
@@ -50,22 +51,48 @@ export class IdentityOperationsService {
     }, 202);
   }
 
+  /**
+   * Imports a guest package into the account. Atomic: every item is processed in
+   * one transaction together with its audit row. Items are validated one by one,
+   * so a bad item is REJECTED with a canonical reason and nothing is silently
+   * dropped; duplicates are reported (never re-created) and a replay of the same
+   * package returns the original counts.
+   */
   async migrateGuest(principal: AuthPrincipal, input: GuestMigrationDto, key: string | undefined): Promise<Record<string, unknown>> {
     return this.idempotency.execute(principal.userId, key, input, async () => {
+      if (input.clientDataVersion !== SUPPORTED_CLIENT_DATA_VERSION) {
+        throw new UnprocessableEntityException({ code: 'VALIDATION_ERROR', message: `clientDataVersion no soportada; usa "${SUPPORTED_CLIENT_DATA_VERSION}".`, details: { field: 'clientDataVersion' } });
+      }
+      if (input.items.length > MAX_MIGRATION_ITEMS) {
+        throw new UnprocessableEntityException({ code: 'VALIDATION_ERROR', message: `Máximo ${MAX_MIGRATION_ITEMS} elementos por migración.`, details: { field: 'items' } });
+      }
       const requestHash = hashRequest(input);
-      const existing = await this.prisma.guestMigrationAudit.findFirst({ where: { userId: principal.userId, requestHash }, orderBy: { createdAt: 'desc' } });
-      if (existing !== null) return { migrationId: existing.id, importedCount: 0, skippedCount: input.items.length, idempotentReplay: true };
-      const audit = await this.prisma.guestMigrationAudit.create({
-        data: {
-          userId: principal.userId,
-          idempotencyKey: key ?? 'validated-by-service',
-          requestHash,
-          status: 'COMPLETED',
-          importedCounts: { items: 0 },
-          completedAt: new Date(),
-        },
+      const existing = await this.prisma.guestMigrationAudit.findFirst({ where: { userId: principal.userId, requestHash, status: 'COMPLETED' }, orderBy: { createdAt: 'desc' } });
+      if (existing !== null) return { ...summaryOf(existing.importedCounts), migrationId: existing.id, idempotentReplay: true };
+
+      return this.prisma.$transaction(async (tx) => {
+        const results: MigrationItemResult[] = [];
+        for (const [index, item] of input.items.entries()) {
+          results.push(await migrateItem(tx, principal.userId, index, item));
+        }
+        const summary = {
+          importedCount: results.filter((r) => r.status === 'IMPORTED').length,
+          skippedCount: results.filter((r) => r.status === 'DUPLICATE').length,
+          rejectedCount: results.filter((r) => r.status === 'REJECTED').length,
+          results,
+        };
+        const audit = await tx.guestMigrationAudit.create({
+          data: {
+            userId: principal.userId,
+            idempotencyKey: key ?? 'validated-by-service',
+            requestHash,
+            status: 'COMPLETED',
+            importedCounts: JSON.parse(JSON.stringify(summary)),
+            completedAt: new Date(),
+          },
+        });
+        return { ...summary, migrationId: audit.id, idempotentReplay: false };
       });
-      return { migrationId: audit.id, importedCount: 0, skippedCount: input.items.length, idempotentReplay: false };
     });
   }
 
@@ -78,4 +105,14 @@ export class IdentityOperationsService {
       return { id: exportRequest.id, status: 'QUEUED', requestedAt: exportRequest.requestedAt.toISOString(), expiresAt: exportRequest.expiresAt?.toISOString() ?? null };
     }, 202);
   }
+}
+
+function summaryOf(stored: unknown): { importedCount: number; skippedCount: number; rejectedCount: number; results: unknown[] } {
+  const value = typeof stored === 'object' && stored !== null ? (stored as Record<string, unknown>) : {};
+  return {
+    importedCount: typeof value.importedCount === 'number' ? value.importedCount : 0,
+    skippedCount: typeof value.skippedCount === 'number' ? value.skippedCount : 0,
+    rejectedCount: typeof value.rejectedCount === 'number' ? value.rejectedCount : 0,
+    results: Array.isArray(value.results) ? value.results : [],
+  };
 }
